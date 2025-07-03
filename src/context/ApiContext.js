@@ -11,9 +11,25 @@ export const useApi = () => {
   return context;
 };
 
-// Configuración de axios para conectar al backend real
+// Configuración dinámica de la URL base
+const getBaseURL = () => {
+  // Si hay una variable de entorno definida, úsala
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  // En desarrollo, usa localhost
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:3001/api';
+  }
+  
+  // En producción, usa tu URL de Railway
+  return 'https://tu-backend.railway.app/api'; // ⚠️ CAMBIA ESTA URL
+};
+
+// Configuración de axios para conectar al backend
 const api = axios.create({
-  baseURL: 'http://localhost:3001/api',
+  baseURL: getBaseURL(),
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
@@ -23,7 +39,7 @@ const api = axios.create({
 // Interceptor para requests
 api.interceptors.request.use(
   (config) => {
-    console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
+    console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
     return config;
   },
   (error) => {
@@ -40,6 +56,7 @@ api.interceptors.response.use(
   },
   (error) => {
     console.error('❌ Response Error:', error.response?.status, error.message);
+    console.error('❌ URL que falló:', error.config?.url);
     return Promise.reject(error);
   }
 );
@@ -48,6 +65,11 @@ export const ApiProvider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Mostrar la URL que se está usando
+  useEffect(() => {
+    console.log('🌐 Base URL configurada:', getBaseURL());
+  }, []);
 
   // Probar conexión al cargar
   useEffect(() => {
@@ -74,6 +96,7 @@ export const ApiProvider = ({ children }) => {
       const errorMessage = err.response?.data?.message || err.message || 'Error de conexión con el servidor';
       setError(errorMessage);
       console.error('🔴 Error de conexión:', errorMessage);
+      console.error('🔴 URL que falló:', err.config?.url);
       throw err;
     } finally {
       setLoading(false);
