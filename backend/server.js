@@ -7,13 +7,13 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Configuración de Railway MySQL
+// Configuración de Railway MySQL usando variables de entorno
 const dbConfig = {
-    host: 'trolley.proxy.rlwy.net',
-    port: 22836,
-    user: 'root',
-    password: 'udiRYhhpLDVVLOmZgLqsxOSBdUfmEFaz',
-    database: 'railway',
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
     ssl: {
         rejectUnauthorized: false
     }
@@ -22,11 +22,17 @@ const dbConfig = {
 // Crear pool de conexiones
 const pool = mysql.createPool(dbConfig);
 
-// Middlewares
+// Middlewares - INCLUIR TU URL DE VERCEL
 app.use(cors({
-    origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'https://tu-usuario.github.io'],
+    origin: [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'https://datos-github-io-umber.vercel.app',  // ← Tu Vercel URL
+        'https://*.vercel.app'  // Para cualquier subdominio de Vercel
+    ],
     credentials: true
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
