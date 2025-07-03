@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartBee - Gestión Apícola</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header p {
+            color: #7f8c8d;
+            font-size: 1.2rem;
+        }
+
+        .bee-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            animation: buzz 2s infinite;
+        }
+
+        @keyframes buzz {
+            0%, 50%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-2px); }
+            75% { transform: translateX(2px); }
+        }
+
+        .nav-tabs {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 10px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-tab {
+            padding: 15px 30px;
+            margin: 0 5px;
+            background: transparent;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            color: #555;
+        }
+
+        .nav-tab.active {
+            background: linear-gradient(135deg, #f4a261, #e9c46a);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(244, 162, 97, 0.4);
+        }
+
+        .nav-tab:hover:not(.active) {
+            background: rgba(244, 162, 97, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .tab-content {
+            display: none;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e6ed;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #f4a261;
+            box-shadow: 0 0 0 3px rgba(244, 162, 97, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #f4a261, #e9c46a);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(244, 162, 97, 0.3);
+            margin-right: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(244, 162, 97, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-refresh {
+            background: linear-gradient(135deg, #2a9d8f, #264653);
+        }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .data-card {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            border-left: 5px solid #f4a261;
+        }
+
+        .data-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+        }
+
+        .data-card h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .data-card p {
+            margin-bottom: 8px;
+            color: #555;
+        }
+
+        .data-card .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status.activa {
+            background: rgba(46, 204, 113, 0.2);
+            color: #27ae60;
+        }
+
+        .status.inactiva {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .alert.success {
+            background: rgba(46, 204, 113, 0.2);
+            color: #27ae60;
+            border: 2px solid rgba(46, 204, 113, 0.3);
+        }
+
+        .alert.error {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+            border: 2px solid rgba(231, 76, 60, 0.3);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #f4a261;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .nav-tabs {
+                flex-wrap: wrap;
+            }
+
+            .nav-tab {
+                padding: 10px 15px;
+                font-size: 0.9rem;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .data-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #f4a261, #e9c46a);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 8px 25px rgba(244, 162, 97, 0.3);
+        }
+
+        .stat-card h3 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .stat-card p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-weight: 600;
+            z-index: 1000;
+        }
+
+        .connection-status.connected {
+            background: rgba(46, 204, 113, 0.9);
+            color: white;
+        }
+
+        .connection-status.disconnected {
+            background: rgba(231, 76, 60, 0.9);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status disconnected" id="connection-status">
+        🔴 Desconectado
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <div class="bee-icon">🐝</div>
+            <h1>SmartBee</h1>
+            <p>Sistema de Gestión Apícola - Conectado a Railway</p>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('dashboard')">📊 Dashboard</button>
+            <button class="nav-tab" onclick="showTab('usuarios')">👥 Usuarios</button>
+            <button class="nav-tab" onclick="showTab('apiarios')">🏠 Apiarios</button>
+            <button class="nav-tab" onclick="showTab('colmenas')">🏺 Colmenas</button>
+            <button class="nav-tab" onclick="showTab('revisiones')">📝 Revisiones</button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <button class="btn btn-refresh" onclick="loadDashboard()">🔄 Actualizar</button>
+            <div class="stats">
+                <div class="stat-card">
+                    <h3 id="total-usuarios">0</h3>
+                    <p>Usuarios Registrados</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="total-apiarios">0</h3>
+                    <p>Apiarios Activos</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="total-colmenas">0</h3>
+                    <p>Colmenas Monitoreadas</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="total-revisiones">0</h3>
+                    <p>Revisiones Realizadas</p>
+                </div>
+            </div>
+            <h2>Últimas Actividades</h2>
+            <div id="recent-activities" class="data-grid">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Cargando datos del dashboard...
+                </div>
+            </div>
+        </div>
+
+        <!-- Usuarios Tab -->
+        <div id="usuarios" class="tab-content">
+            <h2>Gestión de Usuarios</h2>
+            <button class="btn btn-refresh" onclick="loadUsuarios()">🔄 Actualizar</button>
+            
+            <form id="usuario-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="usuario-nombre">Nombre:</label>
+                        <input type="text" id="usuario-nombre" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="usuario-apellido">Apellido:</label>
+                        <input type="text" id="usuario-apellido" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="usuario-email">Email:</label>
+                        <input type="email" id="usuario-email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="usuario-telefono">Teléfono:</label>
+                        <input type="tel" id="usuario-telefono">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="usuario-clave">Contraseña:</label>
+                    <input type="password" id="usuario-clave" required>
+                </div>
+                <button type="submit" class="btn">➕ Crear Usuario</button>
+            </form>
+
+            <div id="usuarios-list" class="data-grid">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Cargando usuarios...
+                </div>
+            </div>
+        </div>
+
+        <!-- Apiarios Tab -->
+        <div id="apiarios" class="tab-content">
+            <h2>Gestión de Apiarios</h2>
+            <button class="btn btn-refresh" onclick="loadApiarios()">🔄 Actualizar</button>
+            
+            <form id="apiario-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="apiario-nombre">Nombre del Apiario:</label>
+                        <input type="text" id="apiario-nombre" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="apiario-ubicacion">Ubicación:</label>
+                        <input type="text" id="apiario-ubicacion" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="apiario-descripcion">Descripción:</label>
+                    <textarea id="apiario-descripcion" rows="3"></textarea>
+                </div>
+                <button type="submit" class="btn">🏠 Crear Apiario</button>
+            </form>
+
+            <div id="apiarios-list" class="data-grid">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Cargando apiarios...
+                </div>
+            </div>
+        </div>
+
+        <!-- Colmenas Tab -->
+        <div id="colmenas" class="tab-content">
+            <h2>Gestión de Colmenas</h2>
+            <button class="btn btn-refresh" onclick="loadColmenas()">🔄 Actualizar</button>
+            
+            <form id="colmena-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="colmena-nombre">Nombre de la Colmena:</label>
+                        <input type="text" id="colmena-nombre" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="colmena-tipo">Tipo de Colmena:</label>
+                        <select id="colmena-tipo">
+                            <option value="Langstroth">Langstroth</option>
+                            <option value="Top Bar">Top Bar</option>
+                            <option value="Warre">Warré</option>
+                            <option value="Kenyan">Kenyan</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="colmena-apiario">Apiario:</label>
+                        <select id="colmena-apiario" required>
+                            <option value="">Seleccionar apiario...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="colmena-dueno">Propietario:</label>
+                        <select id="colmena-dueno" required>
+                            <option value="">Seleccionar propietario...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="colmena-descripcion">Descripción:</label>
+                    <textarea id="colmena-descripcion" rows="3"></textarea>
+                </div>
+                <button type="submit" class="btn">🏺 Crear Colmena</button>
+            </form>
+
+            <div id="colmenas-list" class="data-grid">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Cargando colmenas...
+                </div>
+            </div>
+        </div>
+
+        <!-- Revisiones Tab -->
+        <div id="revisiones" class="tab-content">
+            <h2>Registro de Revisiones</h2>
+            <button class="btn btn-refresh" onclick="loadRevisiones()">🔄 Actualizar</button>
+            
+            <form id="revision-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="revision-colmena">Colmena:</label>
+                        <select id="revision-colmena" required>
+                            <option value="">Seleccionar colmena...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="revision-fecha">Fecha de Revisión:</label>
+                        <input type="datetime-local" id="revision-fecha" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="revision-alzas">Número de Alzas:</label>
+                        <input type="number" id="revision-alzas" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="revision-marcos-abejas">Marcos con Abejas:</label>
+                        <input type="number" id="revision-marcos-abejas" min="0" value="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="revision-temperatura">Temperatura (°C):</label>
+                        <input type="number" id="revision-temperatura" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label for="revision-humedad">Humedad (%):</label>
+                        <input type="number" id="revision-humedad" step="0.1">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="revision-notas">Notas de la Revisión:</label>
+                    <textarea id="revision-notas" rows="4"></textarea>
+                </div>
+                <button type="submit" class="btn">📝 Registrar Revisión</button>
+            </form>
+
+            <div id="revisiones-list" class="data-grid">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Cargando revisiones...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración de la API
+        const API_BASE_URL = 'http://localhost:3001/api';
+
+        // Variables globales
+        let usuarios = [];
+        let apiarios = [];
+        let colmenas = [];
+        let revisiones = [];
+
+        // Función para hacer peticiones HTTP
+        async function apiRequest(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                updateConnectionStatus(true);
+                return data;
+            } catch (error) {
+                console.error('Error en petición API:', error);
+                updateConnectionStatus(false);
+                throw error;
+            }
+        }
+
+        // Actualizar estado de conexión
+        function updateConnectionStatus(connected) {
+            const statusElement = document.getElementById('connection-status');
+            if (connected) {
+                statusElement.className = 'connection-status connected';
+                statusElement.textContent = '🟢 Conectado a Railway';
+            } else {
+                statusElement.className = 'connection-status disconnected';
+                statusElement.textContent = '🔴 Error de Conexión';
+            }
+        }
+
+        // Funciones de navegación
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+
+            loadTabData(tabName);
+        }
+
+        function loadTabData(tabName) {
+            switch(tabName) {
+                case 'dashboard':
+                    loadDashboard();
+                    break;
+                case 'usuarios':
+                    loadUsuarios();
+                    break;
+                case 'apiarios':
+                    loadApiarios();
+                    break;
+                case 'colmenas':
+                    loadColmenas();
+                    break;
+                case 'revisiones':
+                    loadRevisiones();
+                    break;
+            }
+        }
+
+        // Cargar dashboard
+        async function loadDashboard() {
+            try {
+                // Cargar estadísticas
+                const stats = await apiRequest('/dashboard/stats');
+                
+                document.getElementById('total-usuarios').textContent = stats.usuarios;
+                document.getElementById('total-apiarios').textContent = stats.apiarios;
+                document.getElementById('total-colmenas').textContent = stats.colmenas;
+                document.getElementById('total-revisiones').textContent = stats.revisiones;
+
+                // Cargar actividades recientes
+                const recentActivities = await apiRequest('/dashboard/recent');
+
+                const activitiesHtml = recentActivities.map(revision => `
+                    <div class="data-card">
+                        <h3>🆕 Revisión - ${revision.colmena_nombre}</h3>
+                        <p><strong>Fecha:</strong> ${new Date(revision.fecha_revision).toLocaleDateString()}</p>
+                        <p><strong>Inspector:</strong> ${revision.usuario_nombre}</p>
+                        <p><strong>Alzas:</strong> ${revision.num_alzas}</p>
+                        ${revision.temperatura ? `<p><strong>Temperatura:</strong> ${revision.temperatura}°C</p>` : ''}
+                        ${revision.humedad ? `<p><strong>Humedad:</strong> ${revision.humedad}%</p>` : ''}
+                    </div>
+                `).join('');
+
+                document.getElementById('recent-activities').innerHTML = activitiesHtml || '<p>No hay actividades recientes</p>';
+
+            } catch (error) {
+                console.error('Error cargando dashboard:', error);
+                showAlert('error', 'Error cargando datos del dashboard');
+            }
+        }
+
+        // Cargar usuarios
+        async function loadUsuarios() {
+            try {
+                usuarios = await apiRequest('/usuarios');
+
+                const usuariosHtml = usuarios.map(usuario => `
+                    <div class="data-card">
+                        <h3>👤 ${usuario.nombre} ${usuario.apellido}</h3>
+                        <p><strong>Email:</strong> ${usuario.email}</p>
+                        <p><strong>Teléfono:</strong> ${usuario.telefono || 'No especificado'}</p>
+                        <p><strong>Rol:</strong> ${usuario.rol_descripcion}</p>
+                        <p><strong>Registro:</strong> ${new Date(usuario.fecha_registro).toLocaleDateString()}</p>
+                    </div>
+                `).join('');
+
+                document.getElementById('usuarios-list').innerHTML = usuariosHtml || '<p>No hay usuarios registrados</p>';
+
+            } catch (error) {
+                console.error('Error cargando usuarios:', error);
+                showAlert('error', 'Error cargando usuarios');
+            }
+        }
+
+        // Cargar apiarios
+        async function loadApiarios() {
+            try {
+                apiarios = await apiRequest('/apiarios');
+
+                const apiariosHtml = apiarios.map(apiario => `
+                    <div class="data-card">
+                        <h3>🏠 ${apiario.nombre}</h3>
+                        <p><strong>Ubicación:</strong> ${apiario.ubicacion}</p>
+                        <p><strong>Descripción:</strong> ${apiario.descripcion}</p>
+                        <p><strong>Propietario:</strong> ${apiario.propietario_nombre} ${apiario.propietario_apellido}</p>
+                        <p><strong>Colmenas:</strong> ${apiario.total_colmenas}</p>
+                        <p><strong>Creado:</strong> ${new Date(apiario.fecha_creacion).toLocaleDateString()}</p>
+                    </div>
+                `).join('');
+
+                document.getElementById('apiarios-list').innerHTML = apiariosHtml || '<p>No hay apiarios registrados</p>';
+
+            } catch (error) {
+                console.error('Error cargando apiarios:', error);
+                showAlert('error', 'Error cargando apiarios');
+            }
+        }
+
+        // Cargar colmenas
+        async function loadColmenas() {
+            try {
+                // Cargar datos para los selects
+                await loadUsuariosForSelect();
+                await loadApiariosForSelect();
+
+                colmenas = await apiRequest('/colmenas');
+
+                const colmenasHtml = colmenas.map(colmena => `
+                    <div class="data-card">
+                        <h3>🏺 ${colmena.nombre}</h3>
+                        <p><strong>Tipo:</strong> ${colmena.tipo}</p>
+                        <p><strong>Estado:</strong> <span class="status ${colmena.estado}">${colmena.estado}</span></p>
+                        <p><strong>Apiario:</strong> ${colmena.apiario_nombre || 'Sin asignar'}</p>
+                        <p><strong>Propietario:</strong> ${colmena.dueno_nombre} ${colmena.dueno_apellido}</p>
+                        <p><strong>Descripción:</strong> ${colmena.descripcion}</p>
+                        <p><strong>Instalada:</strong> ${new Date(colmena.fecha_instalacion).toLocaleDateString()}</p>
+                    </div>
+                `).join('');
+
+                document.getElementById('colmenas-list').innerHTML = colmenasHtml || '<p>No hay colmenas registradas</p>';
+
+            } catch (error) {
+                console.error('Error cargando colmenas:', error);
+                showAlert('error', 'Error cargando colmenas');
+            }
+        }
+
+        // Cargar revisiones
+        async function loadRevisiones() {
+            try {
+                // Cargar opciones de colmenas para el select
+                await loadColmenasForSelect();
+
+                revisiones = await apiRequest('/revisiones');
+
+                const revisionesHtml = revisiones.map(revision => `
+                    <div class="data-card">
+                        <h3>📝 Revisión - ${revision.colmena_nombre}</h3>
+                        <p><strong>Fecha:</strong> ${new Date(revision.fecha_revision).toLocaleString()}</p>
+                        <p><strong>Inspector:</strong> ${revision.inspector_nombre} ${revision.inspector_apellido}</p>
+                        <p><strong>Alzas:</strong> ${revision.num_alzas} | <strong>Marcos con abejas:</strong> ${revision.marcos_abejas}</p>
+                        <p><strong>Cría:</strong> ${revision.marcos_cria} | <strong>Alimento:</strong> ${revision.marcos_alimento}</p>
+                        <p><strong>Polen:</strong> ${revision.marcos_polen}</p>
+                        <p><strong>Varroa:</strong> ${revision.presencia_varroa} | <strong>Reina:</strong> ${revision.condicion_reina}</p>
+                        ${revision.temperatura ? `<p><strong>Temperatura:</strong> ${revision.temperatura}°C</p>` : ''}
+                        ${revision.humedad ? `<p><strong>Humedad:</strong> ${revision.humedad}%</p>` : ''}
+                        ${revision.peso ? `<p><strong>Peso:</strong> ${revision.peso} kg</p>` : ''}
+                        <p><strong>Notas:</strong> ${revision.notas || 'Sin notas'}</p>
+                    </div>
+                `).join('');
+
+                document.getElementById('revisiones-list').innerHTML = revisionesHtml || '<p>No hay revisiones registradas</p>';
+
+            } catch (error) {
+                console.error('Error cargando revisiones:', error);
+                showAlert('error', 'Error cargando revisiones');
+            }
+        }
+
+        // Funciones auxiliares para cargar datos en selects
+        async function loadUsuariosForSelect() {
+            try {
+                const usuarios = await apiRequest('/select/usuarios');
+                const select = document.getElementById('colmena-dueno');
+                select.innerHTML = '<option value="">Seleccionar propietario...</option>' +
+                    usuarios.map(user => 
+                        `<option value="${user.id}">${user.nombre} ${user.apellido}</option>`
+                    ).join('');
+            } catch (error) {
+                console.error('Error cargando usuarios para select:', error);
+            }
+        }
+
+        async function loadApiariosForSelect() {
+            try {
+                const apiarios = await apiRequest('/select/apiarios');
+                const select = document.getElementById('colmena-apiario');
+                select.innerHTML = '<option value="">Seleccionar apiario...</option>' +
+                    apiarios.map(apiario => 
+                        `<option value="${apiario.id}">${apiario.nombre}</option>`
+                    ).join('');
+            } catch (error) {
+                console.error('Error cargando apiarios para select:', error);
+            }
+        }
+
+        async function loadColmenasForSelect() {
+            try {
+                const colmenas = await apiRequest('/colmenas/activas');
+                const select = document.getElementById('revision-colmena');
+                select.innerHTML = '<option value="">Seleccionar colmena...</option>' +
+                    colmenas.map(colmena => 
+                        `<option value="${colmena.id}">${colmena.nombre}</option>`
+                    ).join('');
+            } catch (error) {
+                console.error('Error cargando colmenas para select:', error);
+            }
+        }
+
+        // Manejadores de formularios
+        document.getElementById('usuario-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                nombre: document.getElementById('usuario-nombre').value,
+                apellido: document.getElementById('usuario-apellido').value,
+                email: document.getElementById('usuario-email').value,
+                telefono: document.getElementById('usuario-telefono').value,
+                clave: document.getElementById('usuario-clave').value
+            };
+
+            try {
+                await apiRequest('/usuarios', {
+                    method: 'POST',
+                    body: JSON.stringify(formData)
+                });
+
+                showAlert('success', '✅ Usuario creado exitosamente');
+                this.reset();
+                loadUsuarios(); // Recargar lista
+            } catch (error) {
+                console.error('Error creando usuario:', error);
+                showAlert('error', '❌ Error al crear usuario');
+            }
+        });
+
+        document.getElementById('apiario-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                nombre: document.getElementById('apiario-nombre').value,
+                ubicacion: document.getElementById('apiario-ubicacion').value,
+                descripcion: document.getElementById('apiario-descripcion').value
+            };
+
+            try {
+                await apiRequest('/apiarios', {
+                    method: 'POST',
+                    body: JSON.stringify(formData)
+                });
+
+                showAlert('success', '✅ Apiario creado exitosamente');
+                this.reset();
+                loadApiarios(); // Recargar lista
+            } catch (error) {
+                console.error('Error creando apiario:', error);
+                showAlert('error', '❌ Error al crear apiario');
+            }
+        });
+
+        document.getElementById('colmena-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                nombre: document.getElementById('colmena-nombre').value,
+                tipo: document.getElementById('colmena-tipo').value,
+                descripcion: document.getElementById('colmena-descripcion').value,
+                dueno: document.getElementById('colmena-dueno').value,
+                apiario_id: document.getElementById('colmena-apiario').value || null
+            };
+
+            if (!formData.dueno) {
+                showAlert('error', '❌ Debe seleccionar un propietario');
+                return;
+            }
+
+            try {
+                await apiRequest('/colmenas', {
+                    method: 'POST',
+                    body: JSON.stringify(formData)
+                });
+
+                showAlert('success', '✅ Colmena creada exitosamente');
+                this.reset();
+                loadColmenas(); // Recargar lista
+            } catch (error) {
+                console.error('Error creando colmena:', error);
+                showAlert('error', '❌ Error al crear colmena');
+            }
+        });
+
+        document.getElementById('revision-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                colmena_id: document.getElementById('revision-colmena').value,
+                fecha_revision: document.getElementById('revision-fecha').value,
+                num_alzas: document.getElementById('revision-alzas').value || 0,
+                marcos_abejas: document.getElementById('revision-marcos-abejas').value || 0,
+                temperatura: document.getElementById('revision-temperatura').value || null,
+                humedad: document.getElementById('revision-humedad').value || null,
+                notas: document.getElementById('revision-notas').value
+            };
+
+            if (!formData.colmena_id) {
+                showAlert('error', '❌ Debe seleccionar una colmena');
+                return;
+            }
+
+            try {
+                await apiRequest('/revisiones', {
+                    method: 'POST',
+                    body: JSON.stringify(formData)
+                });
+
+                showAlert('success', '✅ Revisión registrada exitosamente');
+                this.reset();
+                loadRevisiones(); // Recargar lista
+            } catch (error) {
+                console.error('Error registrando revisión:', error);
+                showAlert('error', '❌ Error al registrar revisión');
+            }
+        });
+
+        // Función para mostrar alertas
+        function showAlert(type, message) {
+            const alert = document.createElement('div');
+            alert.className = `alert ${type}`;
+            alert.textContent = message;
+            
+            const activeTab = document.querySelector('.tab-content.active');
+            activeTab.insertBefore(alert, activeTab.firstChild);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        // Función para probar conexión
+        async function testConnection() {
+            try {
+                console.log('Probando conexión al backend...');
+                const result = await apiRequest('/test-db');
+                console.log('Conexión exitosa:', result);
+                return true;
+            } catch (error) {
+                console.error('Error de conexión:', error);
+                return false;
+            }
+        }
+
+        // Inicializar la aplicación
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('Inicializando SmartBee...');
+            
+            // Probar conexión
+            const connected = await testConnection();
+            updateConnectionStatus(connected);
+            
+            // Cargar dashboard inicial
+            loadDashboard();
+            
+            // Establecer fecha actual en formulario de revisiones
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('revision-fecha').value = now.toISOString().slice(0, 16);
+            
+            console.log('SmartBee inicializado correctamente');
+        });
+
+        // Función para refrescar todos los datos
+        async function refreshAllData() {
+            await loadDashboard();
+            await loadUsuarios();
+            await loadApiarios();
+            await loadColmenas();
+            await loadRevisiones();
+            showAlert('success', '🔄 Datos actualizados correctamente');
+        }
+
+        // Agregar botón de refrescar general (opcional)
+        window.refreshAllData = refreshAllData;
+
+        // Cargar apiarios
+        async function loadApiarios() {
+            try {
+                const result = await executeQuery(`
+                    SELECT a.*, u.nombre as propietario_nombre, u.apellido as propietario_apellido,
+                           COUNT(c.id) as total_colmenas
+                    FROM apiario a 
+                    JOIN usuario u ON a.usuario_id = u.id 
+                    LEFT JOIN colmena c ON c.apiario_id = a.id
+                    GROUP BY a.id
+                    ORDER BY a.fecha_creacion DESC
+                `);
+                
+                apiarios = result.results;
+
+                const apiariosHtml = apiarios.map(apiario => `
+                    <div class="data-card">
+                        <h3>🏠 ${apiario.nombre}</h3>
+                        <p><strong>Ubicación:</strong> ${apiario.ubicacion}</p>
+                        <p><strong>Descripción:</strong> ${apiario.descripcion}</p>
+                        <p><strong>Propietario:</strong> ${apiario.propietario_nombre} ${apiario.propietario_apellido}</p>
+                        <p><strong>Colmenas:</strong> ${apiario.total_colmenas}</p>
+                        <p><strong>Creado:</strong> ${new Date(apiario.fecha_creacion).toLocaleDateString()}</p>
+                    </div>
+                `).join('');
+
+                document.getElementById('apiarios-list').innerHTML = apiariosHtml || '<p>No hay apiarios registrados</p>';
+
+            } catch (error) {
+                console.error('Error cargando apiarios:', error);
+                showAlert('error', 'Error cargando apiarios');
+            }
+        }
+
+        // Cargar colmenas
+        async function loadColmenas() {
+            try {
+                // Cargar datos para los selects
+                await loadUsuariosForSelect();
+                await loadApiariosForSelect();
+
+                const result = await executeQuery(`
+                    SELECT c.*, a.nombre as apiario_nombre, u.nombre as dueno_nombre, u.apellido as dueno_apellido
+                    FROM colmena c 
+                    LEFT JOIN apiario a ON c.apiario_id = a.id 
+                    JOIN usuario u ON c.dueno = u.id 
+                    ORDER BY c.fecha_instalacion DESC
+                `);
+                
+                colmenas = result.results;
+
+                const colmenasHtml = colmenas.map(colmena => `
+                    <div class="data-card">
+                        <h3>🏺 ${colmena.nombre}</h3>
+                        <p><strong>Tipo:</strong> ${colmena.tipo}</p>
+                        <p><strong>Estado:</strong> <span class="status ${colmena.estado}">${colmena.estado}</span></p>
+                        <p><strong>Apiario:</strong> ${colmena.apiario_nombre || 'Sin asignar'}</p>
+                        <p><strong>Propietario:</strong> ${colmena.dueno_nombre} ${colmena.dueno_apellido}</p>
+                        <p><strong>Descripción:</strong> ${colmena.descripcion}</p>
+                        <p><strong>Instalada:</strong> ${new Date(colmena.fecha_instalacion).toLocaleDateString()}</p>
+                    </div>
+                `).join('');
+
+                document.getElementById('colmenas-list').innerHTML = colmenasHtml || '<p>No hay colmenas registradas</p>';
+
+            } catch (error) {
+                console.error('Error cargando colmenas:', error);
+                showAlert('error', 'Error cargando colmenas');
+            }
+        }
+
+        // Cargar revisiones
+        async function loadRevisiones() {
+            try {
+                // Cargar opciones de colmenas para el select
+                await loadColmenasForSelect();
+
+                const result = await executeQuery(`
+                    SELECT r.*, c.nombre as colmena_nombre, u.nombre as inspector_nombre, u.apellido as inspector_apellido
+                    FROM revision r 
+                    JOIN colmena c ON r.colmena_id = c.id 
+                    JOIN usuario u ON r.usuario_id = u.id 
+                    ORDER BY r.fecha_revision DESC
+                `);
+                
+                revisiones = result.results;
+
+                const revisionesHtml = revisiones.map(revision => `
+                    <div class="data-card">
+                        <h3>📝 Revisión - ${revision.colmena_nombre}</h3>
+                        <p><strong>Fecha:</strong> ${new Date(revision.fecha_revision).toLocaleString()}</p>
+                        <p><strong>Inspector:</strong> ${revision.inspector_nombre} ${revision.inspector_apellido}</p>
+                        <p><strong>Alzas:</strong> ${revision.num_alzas} | <strong>Marcos con abejas:</strong> ${revision.marcos_abejas}</p>
+                        <p><strong>Cría:</strong> ${revision.marcos_cria} | <strong>Alimento:</strong> ${revision.marcos_alimento}</p>
+                        <p><strong>Polen:</strong> ${revision.marcos_polen}</p>
+                        <p><strong>Varroa:</strong> ${revision.presencia_varroa} | <strong>Reina:</strong> ${revision.condicion_reina}</p>
+                        ${revision.temperatura ? `<p><strong>Temperatura:</strong> ${revision.temperatura}°C</p>` : ''}
+                        ${revision.humedad ? `<p><strong>Humedad:</strong> ${revision.humedad}%</p>` : ''}
+                        ${revision.peso ? `<p><strong>Peso:</strong> ${revision.peso} kg</p>` : ''}
+                        <p><strong>Notas:</strong> ${revision.notas || 'Sin notas'}</p>
+                    </div>
+                `).join('');
+
+                document.getElementById('revisiones-list').innerHTML = revisionesHtml || '<p>No hay revisiones registradas</p>';
+
+            } catch (error) {
+                console.error('Error cargando revisiones:', error);
+                showAlert('error', 'Error cargando revisiones');
+            }
+        }
+
+        // Funciones auxiliares para cargar datos en selects
+        async function loadUsuariosForSelect() {
+            try {
+                const result = await executeQuery('SELECT id, nombre, apellido FROM usuario ORDER BY nombre');
+                const select = document.getElementById('colmena-dueno');
+                select.innerHTML = '<option value="">Seleccionar propietario...</option>' +
+                    result.results.map(user => 
+                        `<option value="${user.id}">${user.nombre} ${user.apellido}</option>`
+                    ).join('');
+            } catch (error) {
+                console.error('Error cargando usuarios para select:', error);
+            }
+        }
+
+        async function loadApiariosForSelect() {
+            try {
+                const result = await executeQuery('SELECT id, nombre FROM apiario ORDER BY nombre');
+                const select = document.getElementById('colmena-apiario');
+                select.innerHTML = '<option value="">Seleccionar apiario...</option>' +
+                    result.results.map(apiario => 
+                        `<option value="${apiario.id}">${apiario.nombre}</option>`
+                    ).join('');
+            } catch (error) {
+                console.error('Error cargando apiarios para select:', error);
+            }
+        }
+
+        async function loadColmenasForSelect() {
+            try {
+                const result = await executeQuery('SELECT id, nombre FROM colmena WHERE estado = "activa" ORDER BY nombre');
+                const select = document.getElementById('revision-colmena');
+                select.innerHTML = '<option value="">Seleccionar colmena...</option>' +
+                    result.results.map(colmena => 
+                        `<option value="${colmena.id}">${colmena.nombre}</option>`
+                    ).join('');
+            } catch (error) {
+                console.error('Error cargando colmenas para select:', error);
+            }
+        }
+
+        // Manejadores de formularios
+        document.getElementById('usuario-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                nombre: document.getElementById('usuario-nombre').value,
+                apellido: document.getElementById('usuario-apellido').value,
+                email: document.getElementById('usuario-email').value,
+                telefono: document.getElementById('usuario-telefono').value,
+                clave: document.getElementById('usuario-clave').value,
+                rol: 2 // Apicultor por defecto
+            };
+
+            try {
+                const result = await executeQuery(`
+                    INSERT INTO usuario (nombre, apellido, email, telefono, clave, rol) 
+                    VALUES (?, ?, ?, ?, ?, ?)
+                `, [formData.nombre, formData.apellido, formData.email, formData.telefono, formData.clave, formData.rol]);
+
+                if (result.affectedRows > 0) {
+                    showAlert('success', '✅ Usuario creado exitosamente');
+                    this.reset();
+                    loadUsuarios(); // Recargar lista
+                } else {
+                    showAlert('error', '❌ Error al crear usuario');
+                }
+            } catch (error) {
+                console.error('Error creando usuario:', error);
+                showAlert('error', '❌ Error al crear usuario: ' + error.message);
+            }
+        });
+
+        document.getElementById('apiario-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                nombre: document.getElementById('apiario-nombre').value,
+                ubicacion: document.getElementById('apiario-ubicacion').value,
+                descripcion: document.getElementById('apiario-descripcion').value,
+                usuario_id: 2 // Usuario por defecto (Juan Pérez)
+            };
+
+            try {
+                const result = await executeQuery(`
+                    INSERT INTO apiario (nombre, ubicacion, descripcion, usuario_id) 
+                    VALUES (?, ?, ?, ?)
+                `, [formData.nombre, formData.ubicacion, formData.descripcion, formData.usuario_id]);
+
+                if (result.affectedRows > 0) {
+                    showAlert('success', '✅ Apiario creado exitosamente');
+                    this.reset();
+                    loadApiarios(); // Recargar lista
+                } else {
+                    showAlert('error', '❌ Error al crear apiario');
+                }
+            } catch (error) {
+                console.error('Error creando apiario:', error);
+                showAlert('error', '❌ Error al crear apiario: ' + error.message);
+            }
+        });
+
+        document.getElementById('colmena-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                nombre: document.getElementById('colmena-nombre').value,
+                tipo: document.getElementById('colmena-tipo').value,
+                descripcion: document.getElementById('colmena-descripcion').value,
+                dueno: document.getElementById('colmena-dueno').value,
+                apiario_id: document.getElementById('colmena-apiario').value || null
+            };
+
+            if (!formData.dueno) {
+                showAlert('error', '❌ Debe seleccionar un propietario');
+                return;
+            }
+
+            try {
+                const result = await executeQuery(`
+                    INSERT INTO colmena (nombre, tipo, descripcion, dueno, apiario_id) 
+                    VALUES (?, ?, ?, ?, ?)
+                `, [formData.nombre, formData.tipo, formData.descripcion, formData.dueno, formData.apiario_id]);
+
+                if (result.affectedRows > 0) {
+                    showAlert('success', '✅ Colmena creada exitosamente');
+                    this.reset();
+                    loadColmenas(); // Recargar lista
+                } else {
+                    showAlert('error', '❌ Error al crear colmena');
+                }
+            } catch (error) {
+                console.error('Error creando colmena:', error);
+                showAlert('error', '❌ Error al crear colmena: ' + error.message);
+            }
+        });
+
+        document.getElementById('revision-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                colmena_id: document.getElementById('revision-colmena').value,
+                fecha_revision: document.getElementById('revision-fecha').value,
+                num_alzas: document.getElementById('revision-alzas').value || 0,
+                marcos_abejas: document.getElementById('revision-marcos-abejas').value || 0,
+                temperatura: document.getElementById('revision-temperatura').value || null,
+                humedad: document.getElementById('revision-humedad').value || null,
+                notas: document.getElementById('revision-notas').value,
+                usuario_id: 2 // Usuario por defecto (Juan Pérez)
+            };
+
+            if (!formData.colmena_id) {
+                showAlert('error', '❌ Debe seleccionar una colmena');
+                return;
+            }
+
+            try {
+                const result = await executeQuery(`
+                    INSERT INTO revision (colmena_id, fecha_revision, num_alzas, marcos_abejas, temperatura, humedad, notas, usuario_id) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                `, [formData.colmena_id, formData.fecha_revision, formData.num_alzas, formData.marcos_abejas, 
+                    formData.temperatura, formData.humedad, formData.notas, formData.usuario_id]);
+
+                if (result.affectedRows > 0) {
+                    showAlert('success', '✅ Revisión registrada exitosamente');
+                    this.reset();
+                    loadRevisiones(); // Recargar lista
+                } else {
+                    showAlert('error', '❌ Error al registrar revisión');
+                }
+            } catch (error) {
+                console.error('Error registrando revisión:', error);
+                showAlert('error', '❌ Error al registrar revisión: ' + error.message);
+            }
+        });
+
+        // Función para mostrar alertas
+        function showAlert(type, message) {
+            const alert = document.createElement('div');
+            alert.className = `alert ${type}`;
+            alert.textContent = message;
+            
+            const activeTab = document.querySelector('.tab-content.active');
+            activeTab.insertBefore(alert, activeTab.firstChild);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        // Función para probar conexión a Railway
+        async function testRailwayConnection() {
+            try {
+                console.log('Probando conexión a Railway...');
+                const result = await executeQuery('SELECT 1 as test');
+                console.log('Conexión exitosa:', result);
+                return true;
+            } catch (error) {
+                console.error('Error de conexión:', error);
+                return false;
+            }
+        }
+
+        // Inicializar la aplicación
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('Inicializando SmartBee...');
+            
+            // Probar conexión
+            const connected = await testRailwayConnection();
+            updateConnectionStatus(connected);
+            
+            // Cargar dashboard inicial
+            loadDashboard();
+            
+            // Establecer fecha actual en formulario de revisiones
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('revision-fecha').value = now.toISOString().slice(0, 16);
+            
+            console.log('SmartBee inicializado correctamente');
+        });
+
+        // Función para refrescar todos los datos
+        async function refreshAllData() {
+            await loadDashboard();
+            await loadUsuarios();
+            await loadApiarios();
+            await loadColmenas();
+            await loadRevisiones();
+            showAlert('success', '🔄 Datos actualizados correctamente');
+        }
+
+        // Agregar botón de refrescar general (opcional)
+        window.refreshAllData = refreshAllData;
