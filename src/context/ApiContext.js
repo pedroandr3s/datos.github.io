@@ -18,13 +18,13 @@ const getBaseURL = () => {
     return process.env.REACT_APP_API_URL;
   }
   
-  // En desarrollo, usa localhost (puerto 8080 que viste en los logs)
+  // En desarrollo, usa localhost
   if (process.env.NODE_ENV === 'development') {
     return 'http://localhost:8080/api';
   }
   
-  // En producción, usa tu URL de Railway
-  return 'https://tu-backend.railway.app/api'; // ⚠️ CAMBIA ESTA URL
+  // En producción, usa tu URL real de Railway
+  return 'https://backend-production-6c78.up.railway.app/api';
 };
 
 // Configuración de axios para conectar al backend
