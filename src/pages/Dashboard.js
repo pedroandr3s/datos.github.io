@@ -31,7 +31,7 @@ const Dashboard = () => {
   const StatCard = ({ title, value, icon, color }) => (
     <div className={`card p-6 text-center ${color}`}>
       <div className="text-4xl mb-2">{icon}</div>
-      <h3 className="text-2xl font-bold text-white mb-1">
+      <h3 className="text-2xl font-bold text-black mb-1">
         {loading ? '...' : value}
       </h3>
       <p className="text-white text-opacity-80 text-sm font-medium">
