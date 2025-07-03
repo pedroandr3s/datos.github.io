@@ -1,18 +1,13 @@
-// =============================================
-// 📁 backend-proxy/server.js
-// Servidor proxy para conectar la página web con Railway
-// =============================================
-
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Configuración de Railway
-// Cambiar esta parte en server.js:
+// Configuración de Railway MySQL
 const dbConfig = {
     host: 'trolley.proxy.rlwy.net',
     port: 22836,
@@ -21,11 +16,7 @@ const dbConfig = {
     database: 'railway',
     ssl: {
         rejectUnauthorized: false
-    },
-    // Remover estas líneas que causan warning:
-    // connectTimeout: 60000,
-    // acquireTimeout: 60000,
-    // timeout: 60000
+    }
 };
 
 // Crear pool de conexiones
@@ -33,7 +24,7 @@ const pool = mysql.createPool(dbConfig);
 
 // Middlewares
 app.use(cors({
-    origin: ['http://localhost:3000', 'https://tu-usuario.github.io'],
+    origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'https://tu-usuario.github.io'],
     credentials: true
 }));
 app.use(express.json());
@@ -46,13 +37,13 @@ app.use((req, res, next) => {
 });
 
 // =============================================
-// RUTAS DE LA API
+// RUTAS BÁSICAS
 // =============================================
 
-// Ruta de prueba
+// Ruta de salud
 app.get('/api/health', (req, res) => {
     res.json({ 
-        message: 'SmartBee API Proxy funcionando',
+        message: 'SmartBee API funcionando correctamente',
         timestamp: new Date().toISOString(),
         database: 'Railway MySQL'
     });
@@ -61,17 +52,17 @@ app.get('/api/health', (req, res) => {
 // Probar conexión a base de datos
 app.get('/api/test-db', async (req, res) => {
     try {
-        const [rows] = await pool.execute('SELECT 1 as test');
+        const [rows] = await pool.execute('SELECT 1 as test, NOW() as timestamp');
         res.json({ 
             connected: true,
             test: rows[0].test,
-            timestamp: new Date().toISOString()
+            timestamp: rows[0].timestamp
         });
     } catch (error) {
+        console.error('Error en test-db:', error);
         res.status(500).json({ 
             connected: false,
-            error: error.message,
-            timestamp: new Date().toISOString()
+            error: error.message
         });
     }
 });
@@ -320,7 +311,7 @@ app.get('/api/dashboard/recent', async (req, res) => {
 });
 
 // =============================================
-// RUTAS AUXILIARES
+// RUTAS AUXILIARES PARA SELECTS
 // =============================================
 
 // Obtener usuarios para selects
@@ -375,10 +366,10 @@ const startServer = async () => {
         connection.release();
         
         app.listen(PORT, () => {
-            console.log(`🚀 Servidor SmartBee Proxy ejecutándose en puerto ${PORT}`);
+            console.log(`🚀 Servidor SmartBee ejecutándose en puerto ${PORT}`);
             console.log(`🌐 API disponible en: http://localhost:${PORT}/api`);
             console.log(`🗄️  Base de datos: Railway MySQL`);
-            console.log(`📋 Endpoints disponibles:`);
+            console.log(`📋 Endpoints principales:`);
             console.log(`   GET  /api/health - Estado del servidor`);
             console.log(`   GET  /api/test-db - Prueba de base de datos`);
             console.log(`   GET  /api/usuarios - Obtener usuarios`);
@@ -394,21 +385,18 @@ const startServer = async () => {
         });
     } catch (error) {
         console.error('❌ Error conectando a Railway:', error.message);
-        console.log('⚠️  Iniciando servidor en modo de desarrollo...');
+        console.log('⚠️  Iniciando servidor sin base de datos...');
         
         app.listen(PORT, () => {
-            console.log(`🚀 Servidor SmartBee Proxy (modo desarrollo) en puerto ${PORT}`);
-            console.log(`⚠️  Sin conexión a base de datos - usar datos simulados`);
+            console.log(`🚀 Servidor SmartBee (modo desarrollo) en puerto ${PORT}`);
+            console.log(`⚠️  Sin conexión a base de datos`);
         });
     }
 };
 
 startServer();
 
-// =============================================
-// MANEJO DE SEÑALES DE CIERRE
-// =============================================
-
+// Manejo de cierre
 process.on('SIGINT', async () => {
     console.log('\n🔄 Cerrando servidor...');
     await pool.end();
