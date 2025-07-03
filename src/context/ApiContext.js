@@ -24,7 +24,7 @@ const getBaseURL = () => {
   }
   
   // En producción, usa tu URL de Railway
-  return 'https://tu-backend.railway.app/api'; // ⚠️ CAMBIA ESTA URL
+  return 'https://backend-production-6c78.up.railway.app/'; // ⚠️ CAMBIA ESTA URL
 };
 
 // Configuración de axios para conectar al backend
