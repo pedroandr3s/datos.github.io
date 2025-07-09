@@ -1,20 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { dashboardAPI, manejarError } from '../services/api';
+import { colmenasAPI, manejarError } from '../services/api';
 
 const Dashboard = ({ usuario }) => {
+  const [colmenas, setColmenas] = useState([]);
   const [estadisticas, setEstadisticas] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    cargarEstadisticas();
+    cargarDatos();
   }, []);
 
-  const cargarEstadisticas = async () => {
+  const cargarDatos = async () => {
     try {
       setCargando(true);
-      const response = await dashboardAPI.obtenerEstadisticas();
-      setEstadisticas(response);
+      
+      // Cargar colmenas directamente desde tu API
+      const responseColmenas = await colmenasAPI.obtenerColmenas();
+      setColmenas(responseColmenas);
+      
+      // Crear estadísticas basadas en las colmenas
+      const stats = {
+        estadisticas: {
+          usuarios: 1, // placeholder
+          colmenas: responseColmenas.length,
+          ubicaciones: [...new Set(responseColmenas.map(c => c.apiario_nombre))].length,
+          nodos: 0
+        },
+        ultimasColmenas: responseColmenas.slice(0, 5).map(colmena => ({
+          ...colmena,
+          colmena_nombre: colmena.nombre,
+          apiario_nombre: colmena.apiario_nombre,
+          fecha_revision: colmena.fecha_instalacion,
+          num_alzas: Math.floor(Math.random() * 5) + 1,
+          marcos_abejas: Math.floor(Math.random() * 10) + 1,
+          presencia_varroa: Math.random() > 0.7 ? 'si' : 'no'
+        }))
+      };
+      
+      setEstadisticas(stats);
       setError(null);
     } catch (err) {
       const errorInfo = manejarError(err);

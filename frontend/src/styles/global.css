@@ -108,33 +108,7 @@ body {
   transition: margin-left 0.3s ease;
   max-width: 100%;
 }
-.link-button {
-  background: none;
-  border: none;
-  color: var(--primary-color);
-  text-decoration: underline;
-  cursor: pointer;
-  font-size: inherit;
-  padding: 0;
-  margin-top: var(--spacing-md);
-  transition: color 0.2s ease;
-}
 
-.link-button:hover {
-  text-decoration: none;
-  color: var(--primary-dark, #1a5490);
-}
-
-.link-button:focus {
-  outline: 2px solid var(--primary-color);
-  outline-offset: 2px;
-}
-
-.link-button:disabled {
-  color: var(--gray-400);
-  cursor: not-allowed;
-  text-decoration: none;
-}
 .main-content.sidebar-open {
   margin-left: var(--sidebar-width);
 }
@@ -1684,6 +1658,43 @@ body {
 .shadow-md { box-shadow: var(--shadow-md); }
 .shadow-lg { box-shadow: var(--shadow-lg); }
 .shadow-xl { box-shadow: var(--shadow-xl); }
+
+.detail.success {
+  background-color: #d4edda;
+  color: var(--success-color);
+}
+
+.revision-descripcion {
+  margin-top: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  color: var(--gray-600);
+  font-style: italic;
+}
+
+.apiarios-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.apiario-summary-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-md);
+}
+
+.apiario-summary-card h4 {
+  margin: 0 0 var(--spacing-sm) 0;
+  color: var(--gray-800);
+}
+
+.apiario-stats {
+  display: flex;
+  gap: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--gray-600);
+}
 
 /* Print styles */
 @media print {
