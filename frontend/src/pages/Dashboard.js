@@ -14,49 +14,93 @@ const Dashboard = ({ usuario }) => {
   const cargarDatos = async () => {
     try {
       setCargando(true);
+      setError(null);
       
-      // Cargar colmenas directamente desde tu API
+      // Cargar colmenas con manejo seguro
       const responseColmenas = await colmenasAPI.obtenerColmenas();
-      setColmenas(responseColmenas);
+      
+      // Verificar si la respuesta es exitosa y tiene datos
+      let colmenasData = [];
+      if (responseColmenas && responseColmenas.success) {
+        colmenasData = Array.isArray(responseColmenas.data) ? responseColmenas.data : [];
+      } else if (Array.isArray(responseColmenas)) {
+        // Si la API devuelve directamente un array
+        colmenasData = responseColmenas;
+      } else {
+        console.warn('Respuesta inesperada de la API:', responseColmenas);
+        colmenasData = [];
+      }
+      
+      setColmenas(colmenasData);
       
       // Crear estadísticas basadas en las colmenas
+      const apiarios = [...new Set(colmenasData.map(c => c.apiario_nombre || c.apiario_id))];
+      
       const stats = {
         estadisticas: {
-          usuarios: 1, // placeholder
-          colmenas: responseColmenas.length,
-          ubicaciones: [...new Set(responseColmenas.map(c => c.apiario_nombre))].length,
+          apiarios: apiarios.length,
+          colmenas: colmenasData.length,
+          usuarios: 1,
+          ubicaciones: apiarios.length,
           nodos: 0
         },
-        ultimasColmenas: responseColmenas.slice(0, 5).map(colmena => ({
-          ...colmena,
-          colmena_nombre: colmena.nombre,
-          apiario_nombre: colmena.apiario_nombre,
-          fecha_revision: colmena.fecha_instalacion,
-          num_alzas: Math.floor(Math.random() * 5) + 1,
-          marcos_abejas: Math.floor(Math.random() * 10) + 1,
-          presencia_varroa: Math.random() > 0.7 ? 'si' : 'no'
+        ultimasColmenas: colmenasData.slice(0, 5).map(colmena => ({
+          id: colmena.id || Math.random(),
+          colmena_nombre: colmena.nombre || `Colmena ${colmena.id}`,
+          apiario_nombre: colmena.apiario_nombre || 'Apiario sin nombre',
+          fecha_revision: colmena.fecha_instalacion || colmena.created_at || new Date().toISOString(),
+          num_alzas: colmena.num_alzas || Math.floor(Math.random() * 5) + 1,
+          marcos_abejas: colmena.marcos_abejas || Math.floor(Math.random() * 10) + 1,
+          presencia_varroa: colmena.presencia_varroa || (Math.random() > 0.7 ? 'si' : 'no')
         }))
       };
       
       setEstadisticas(stats);
-      setError(null);
+      
     } catch (err) {
-      const errorInfo = manejarError(err);
+      console.error('Error cargando datos del dashboard:', err);
+      const errorInfo = manejarError ? manejarError(err) : { mensaje: err.message || 'Error desconocido' };
       setError(errorInfo);
+      
+      // Establecer valores por defecto en caso de error
+      setColmenas([]);
+      setEstadisticas({
+        estadisticas: {
+          apiarios: 0,
+          colmenas: 0,
+          usuarios: 1,
+          ubicaciones: 0,
+          nodos: 0
+        },
+        ultimasColmenas: []
+      });
     } finally {
       setCargando(false);
     }
   };
 
-  const formatearFecha = (fecha) => {
-    return new Date(fecha).toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  // Función para reintentar (corregida)
+  const cargarEstadisticas = () => {
+    cargarDatos();
   };
+
+  const formatearFecha = (fecha) => {
+    try {
+      if (!fecha) return 'Fecha no disponible';
+      return new Date(fecha).toLocaleDateString('es-ES', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return 'Fecha inválida';
+    }
+  };
+
+  // Debug: Mostrar el estado actual
+  console.log('Dashboard state:', { cargando, error, estadisticas, colmenas });
 
   if (cargando) {
     return (
@@ -74,7 +118,7 @@ const Dashboard = ({ usuario }) => {
       <div className="dashboard-error">
         <div className="error-content">
           <h2>Error al cargar el dashboard</h2>
-          <p>{error.mensaje}</p>
+          <p>{error.mensaje || 'Error desconocido'}</p>
           <button 
             className="btn btn-primary"
             onClick={cargarEstadisticas}
@@ -86,12 +130,24 @@ const Dashboard = ({ usuario }) => {
     );
   }
 
+  // Verificar que estadisticas exista antes de renderizar
+  if (!estadisticas) {
+    return (
+      <div className="dashboard-loading">
+        <div className="loading-spinner">
+          <div className="bee-icon">🐝</div>
+          <p>Preparando dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="dashboard">
       {/* Header del Dashboard */}
       <div className="dashboard-header">
         <div className="welcome-section">
-          <h1>¡Bienvenido, {usuario?.nombre}! 🐝</h1>
+          <h1>¡Bienvenido, {usuario?.nombre || 'Usuario'}! 🐝</h1>
           <p className="welcome-subtitle">
             Aquí tienes un resumen de tu actividad apícola
           </p>
