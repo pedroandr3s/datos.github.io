@@ -54,6 +54,16 @@ const Login = ({ onLogin }) => {
     setMostrarPassword(!mostrarPassword);
   };
 
+  // Función para manejar el "olvidar contraseña"
+  const handleForgotPassword = () => {
+    // Por ahora solo muestra una alerta, puedes implementar la lógica completa después
+    alert('Funcionalidad de recuperación de contraseña estará disponible próximamente.');
+    
+    // Ejemplo de implementación futura:
+    // navigate('/forgot-password');
+    // o abrir un modal para recuperación
+  };
+
   return (
     <div className="login-container">
       <div className="login-card fade-in">
@@ -148,11 +158,13 @@ const Login = ({ onLogin }) => {
           </button>
         </form>
 
-        <div className="login-actions">
-          <a href="#" className="forgot-password" onClick={(e) => e.preventDefault()}>
-            ¿Olvidaste tu contraseña?
-          </a>
-        </div>
+        <button 
+          type="button" 
+          className="link-button" 
+          onClick={handleForgotPassword}
+        >
+          ¿Olvidaste tu contraseña?
+        </button>
 
         {/* Demo credentials info */}
         <div style={{ 

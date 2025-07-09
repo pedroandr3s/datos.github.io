@@ -108,7 +108,33 @@ body {
   transition: margin-left 0.3s ease;
   max-width: 100%;
 }
+.link-button {
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+  margin-top: var(--spacing-md);
+  transition: color 0.2s ease;
+}
 
+.link-button:hover {
+  text-decoration: none;
+  color: var(--primary-dark, #1a5490);
+}
+
+.link-button:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.link-button:disabled {
+  color: var(--gray-400);
+  cursor: not-allowed;
+  text-decoration: none;
+}
 .main-content.sidebar-open {
   margin-left: var(--sidebar-width);
 }
