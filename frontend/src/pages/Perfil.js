@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { usuariosAPI, manejarError } from '../services/api';
 
 const Perfil = ({ usuario }) => {
@@ -14,19 +14,9 @@ const Perfil = ({ usuario }) => {
   const [mensaje, setMensaje] = useState(null);
   const [errores, setErrores] = useState({});
   const [mostrarCambiarPassword, setMostrarCambiarPassword] = useState(false);
-  const [passwordData, setPasswordData] = useState({
-    passwordActual: '',
-    passwordNueva: '',
-    confirmarPassword: ''
-  });
 
-  useEffect(() => {
-    if (usuario) {
-      cargarPerfil();
-    }
-  }, [usuario]);
-
-  const cargarPerfil = async () => {
+  // Memoized function to avoid useEffect dependency issues
+  const cargarPerfil = useCallback(async () => {
     try {
       setCargando(true);
       const response = await usuariosAPI.obtenerPerfil(usuario.id);
@@ -43,7 +33,13 @@ const Perfil = ({ usuario }) => {
     } finally {
       setCargando(false);
     }
-  };
+  }, [usuario?.id]);
+
+  useEffect(() => {
+    if (usuario?.id) {
+      cargarPerfil();
+    }
+  }, [usuario?.id, cargarPerfil]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -59,14 +55,6 @@ const Perfil = ({ usuario }) => {
         [name]: null
       }));
     }
-  };
-
-  const handlePasswordChange = (e) => {
-    const { name, value } = e.target;
-    setPasswordData(prev => ({
-      ...prev,
-      [name]: value
-    }));
   };
 
   const validarFormulario = () => {
@@ -86,7 +74,8 @@ const Perfil = ({ usuario }) => {
       nuevosErrores.email = 'El email no es válido';
     }
 
-    if (datos.telefono && !/^\+?[\d\s\-\(\)]+$/.test(datos.telefono)) {
+    // Fixed regex - removed unnecessary escape characters
+    if (datos.telefono && !/^\+?[\d\s\-()]+$/.test(datos.telefono)) {
       nuevosErrores.telefono = 'El teléfono no es válido';
     }
 
