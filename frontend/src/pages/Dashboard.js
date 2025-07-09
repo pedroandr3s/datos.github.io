@@ -1,344 +1,230 @@
 import React, { useState, useEffect } from 'react';
-import { colmenasAPI, manejarError } from '../services/api';
+import { useApi } from '../context/ApiContext';
 
-const Dashboard = ({ usuario }) => {
-  const [colmenas, setColmenas] = useState([]);
-  const [estadisticas, setEstadisticas] = useState(null);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState(null);
+const Dashboard = () => {
+  const { dashboard, loading } = useApi();
+  const [stats, setStats] = useState({
+    usuarios: 0,
+    apiarios: 0,
+    colmenas: 0,
+    revisiones: 0
+  });
+  const [recentActivities, setRecentActivities] = useState([]);
 
   useEffect(() => {
-    cargarDatos();
+    loadDashboardData();
   }, []);
 
-  const cargarDatos = async () => {
+  const loadDashboardData = async () => {
     try {
-      setCargando(true);
-      setError(null);
-      
-      // Cargar colmenas con manejo seguro
-      const responseColmenas = await colmenasAPI.obtenerColmenas();
-      
-      // Verificar si la respuesta es exitosa y tiene datos
-      let colmenasData = [];
-      if (responseColmenas && responseColmenas.success) {
-        colmenasData = Array.isArray(responseColmenas.data) ? responseColmenas.data : [];
-      } else if (Array.isArray(responseColmenas)) {
-        // Si la API devuelve directamente un array
-        colmenasData = responseColmenas;
-      } else {
-        console.warn('Respuesta inesperada de la API:', responseColmenas);
-        colmenasData = [];
-      }
-      
-      setColmenas(colmenasData);
-      
-      // Crear estadísticas basadas en las colmenas
-      const apiarios = [...new Set(colmenasData.map(c => c.apiario_nombre || c.apiario_id))];
-      
-      const stats = {
-        estadisticas: {
-          apiarios: apiarios.length,
-          colmenas: colmenasData.length,
-          usuarios: 1,
-          ubicaciones: apiarios.length,
-          nodos: 0
-        },
-        ultimasColmenas: colmenasData.slice(0, 5).map(colmena => ({
-          id: colmena.id || Math.random(),
-          colmena_nombre: colmena.nombre || `Colmena ${colmena.id}`,
-          apiario_nombre: colmena.apiario_nombre || 'Apiario sin nombre',
-          fecha_revision: colmena.fecha_instalacion || colmena.created_at || new Date().toISOString(),
-          num_alzas: colmena.num_alzas || Math.floor(Math.random() * 5) + 1,
-          marcos_abejas: colmena.marcos_abejas || Math.floor(Math.random() * 10) + 1,
-          presencia_varroa: colmena.presencia_varroa || (Math.random() > 0.7 ? 'si' : 'no')
-        }))
-      };
-      
-      setEstadisticas(stats);
-      
-    } catch (err) {
-      console.error('Error cargando datos del dashboard:', err);
-      const errorInfo = manejarError ? manejarError(err) : { mensaje: err.message || 'Error desconocido' };
-      setError(errorInfo);
-      
-      // Establecer valores por defecto en caso de error
-      setColmenas([]);
-      setEstadisticas({
-        estadisticas: {
-          apiarios: 0,
-          colmenas: 0,
-          usuarios: 1,
-          ubicaciones: 0,
-          nodos: 0
-        },
-        ultimasColmenas: []
-      });
-    } finally {
-      setCargando(false);
-    }
-  };
-
-  // Función para reintentar (corregida)
-  const cargarEstadisticas = () => {
-    cargarDatos();
-  };
-
-  const formatearFecha = (fecha) => {
-    try {
-      if (!fecha) return 'Fecha no disponible';
-      return new Date(fecha).toLocaleDateString('es-ES', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      const [statsData, recentData] = await Promise.all([
+        dashboard.getStats(),
+        dashboard.getRecent()
+      ]);
+      setStats(statsData);
+      setRecentActivities(recentData);
     } catch (error) {
-      return 'Fecha inválida';
+      console.log('Error cargando dashboard:', error);
     }
   };
 
-  // Debug: Mostrar el estado actual
-  console.log('Dashboard state:', { cargando, error, estadisticas, colmenas });
+  const StatCard = ({ title, value, icon, color }) => (
+    <div className={`card p-6 text-center ${color}`}>
+      <div className="text-4xl mb-2">{icon}</div>
+      <h3 className="text-2xl font-bold text-white mb-1">
+        {loading ? '...' : value}
+      </h3>
+      <p className="text-white text-opacity-80 text-sm font-medium">
+        {title}
+      </p>
+    </div>
+  );
 
-  if (cargando) {
-    return (
-      <div className="dashboard-loading">
-        <div className="loading-spinner">
-          <div className="bee-icon">🐝</div>
-          <p>Cargando dashboard...</p>
+  const ActivityCard = ({ activity }) => (
+    <div className="card p-4 border-l-4 border-yellow-400">
+      <div className="flex items-start">
+        <div className="bg-yellow-100 p-2 rounded-lg mr-3">
+          <span className="text-lg">📝</span>
         </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="dashboard-error">
-        <div className="error-content">
-          <h2>Error al cargar el dashboard</h2>
-          <p>{error.mensaje || 'Error desconocido'}</p>
-          <button 
-            className="btn btn-primary"
-            onClick={cargarEstadisticas}
-          >
-            Reintentar
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Verificar que estadisticas exista antes de renderizar
-  if (!estadisticas) {
-    return (
-      <div className="dashboard-loading">
-        <div className="loading-spinner">
-          <div className="bee-icon">🐝</div>
-          <p>Preparando dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="dashboard">
-      {/* Header del Dashboard */}
-      <div className="dashboard-header">
-        <div className="welcome-section">
-          <h1>¡Bienvenido, {usuario?.nombre || 'Usuario'}! 🐝</h1>
-          <p className="welcome-subtitle">
-            Aquí tienes un resumen de tu actividad apícola
+        <div className="flex-1">
+          <h4 className="font-semibold text-gray-900">
+            Revisión - {activity.colmena_nombre}
+          </h4>
+          <p className="text-sm text-gray-600 mt-1">
+            Inspector: {activity.usuario_nombre}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {new Date(activity.fecha_revision).toLocaleDateString('es-ES')}
           </p>
         </div>
-        <div className="date-section">
-          <div className="current-date">
-            {new Date().toLocaleDateString('es-ES', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          🐝 Dashboard SmartBee
+        </h1>
+        <p className="text-gray-600">
+          Resumen general de tu sistema apícola
+        </p>
+      </div>
+
+      {/* Estadísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard
+          title="Usuarios Registrados"
+          value={stats.usuarios}
+          icon="👥"
+          color="bg-gradient-to-br from-blue-500 to-blue-600"
+        />
+        <StatCard
+          title="Apiarios Activos"
+          value={stats.apiarios}
+          icon="🏠"
+          color="bg-gradient-to-br from-green-500 to-green-600"
+        />
+        <StatCard
+          title="Colmenas Monitoreadas"
+          value={stats.colmenas}
+          icon="🏺"
+          color="bg-gradient-to-br from-yellow-500 to-yellow-600"
+        />
+        <StatCard
+          title="Revisiones Realizadas"
+          value={stats.revisiones}
+          icon="📝"
+          color="bg-gradient-to-br from-purple-500 to-purple-600"
+        />
+      </div>
+
+      {/* Estado del Sistema */}
+      <div className="card p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Estado del Sistema
+            </h2>
+            <div className="flex items-center text-green-600">
+              <div className="w-3 h-3 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+              <span className="font-medium">Sistema funcionando correctamente</span>
+            </div>
+            <p className="text-sm text-gray-500 mt-1">
+              Última actualización: {new Date().toLocaleString('es-ES')}
+            </p>
+          </div>
+          <div className="text-6xl opacity-20">
+            🍯
           </div>
         </div>
       </div>
 
-      {/* Tarjetas de Estadísticas */}
-      <div className="stats-grid">
-        <div className="stat-card apiarios">
-          <div className="stat-icon">🏡</div>
-          <div className="stat-content">
-            <h3>Apiarios</h3>
-            <div className="stat-number">
-              {estadisticas?.estadisticas?.apiarios || 0}
-            </div>
-            <p className="stat-description">Total de apiarios registrados</p>
-          </div>
-        </div>
-
-        <div className="stat-card colmenas">
-          <div className="stat-icon">🍯</div>
-          <div className="stat-content">
-            <h3>Colmenas</h3>
-            <div className="stat-number">
-              {estadisticas?.estadisticas?.colmenas || 0}
-            </div>
-            <p className="stat-description">Colmenas bajo monitoreo</p>
-          </div>
-        </div>
-
-        <div className="stat-card usuarios">
-          <div className="stat-icon">👥</div>
-          <div className="stat-content">
-            <h3>Usuarios</h3>
-            <div className="stat-number">
-              {estadisticas?.estadisticas?.usuarios || 0}
-            </div>
-            <p className="stat-description">Usuarios en el sistema</p>
-          </div>
-        </div>
-
-        <div className="stat-card productividad">
-          <div className="stat-icon">📈</div>
-          <div className="stat-content">
-            <h3>Productividad</h3>
-            <div className="stat-number">95%</div>
-            <p className="stat-description">Eficiencia promedio</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Contenido Principal */}
-      <div className="dashboard-content">
-        {/* Últimas Revisiones */}
-        <div className="content-section">
-          <div className="section-header">
-            <h2>📋 Últimas Colmenas</h2>
-            <button className="btn btn-outline">Ver todas</button>
-          </div>
-          
-          <div className="revisiones-recientes">
-            {estadisticas?.ultimasColmenas?.length > 0 ? (
-              estadisticas.ultimasColmenas.map(colmena => (
-                <div key={colmena.id} className="revision-card">
-                  <div className="revision-info">
-                    <h4>{colmena.colmena_nombre}</h4>
-                    <p className="apiario-name">{colmena.apiario_nombre}</p>
-                    <div className="revision-details">
-                      <span className="detail">
-                        🏠 {colmena.num_alzas || 0} alzas
-                      </span>
-                      <span className="detail">
-                        🐝 {colmena.marcos_abejas || 0} marcos con abejas
-                      </span>
-                      {colmena.presencia_varroa === 'si' && (
-                        <span className="detail warning">
-                          ⚠️ Varroa detectada
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="revision-fecha">
-                    {formatearFecha(colmena.fecha_revision)}
-                  </div>
-                </div>
-              ))
+      {/* Actividades Recientes */}
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Actividades Recientes
+          </h2>
+          <button
+            onClick={loadDashboardData}
+            className="btn btn-secondary text-sm"
+            disabled={loading}
+          >
+            {loading ? (
+              <span className="animate-spin mr-2">⟳</span>
             ) : (
-              <div className="empty-state">
-                <div className="empty-icon">📝</div>
-                <h3>No hay colmenas registradas</h3>
-                <p>Comienza registrando tu primera colmena en el sistema</p>
-                <button className="btn btn-primary">
-                  Nueva Colmena
-                </button>
-              </div>
+              <span className="mr-2">🔄</span>
             )}
+            Actualizar
+          </button>
+        </div>
+
+        {loading && recentActivities.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="animate-spin text-3xl mb-2">⟳</div>
+            <p className="text-gray-600">Cargando actividades...</p>
+          </div>
+        ) : recentActivities.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="text-4xl mb-2">📋</div>
+            <p className="text-gray-600 mb-2">No hay actividades recientes</p>
+            <p className="text-sm text-gray-500">Las revisiones aparecerán aquí una vez que comiences a registrarlas</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {recentActivities.map((activity) => (
+              <ActivityCard key={activity.id} activity={activity} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Información de la aplicación */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="card p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">
+            🎯 Acciones Rápidas
+          </h3>
+          <div className="space-y-2">
+            <button className="w-full btn btn-primary text-left">
+              <span className="mr-2">👥</span>
+              Gestionar Usuarios
+            </button>
+            <button className="w-full btn btn-secondary text-left">
+              <span className="mr-2">🏠</span>
+              Agregar Apiario
+            </button>
+            <button className="w-full btn btn-secondary text-left">
+              <span className="mr-2">🏺</span>
+              Registrar Colmena
+            </button>
+            <button className="w-full btn btn-secondary text-left">
+              <span className="mr-2">📝</span>
+              Nueva Revisión
+            </button>
           </div>
         </div>
 
-        {/* Acciones Rápidas */}
-        <div className="content-section">
-          <div className="section-header">
-            <h2>⚡ Acciones Rápidas</h2>
-          </div>
-          
-          <div className="acciones-grid">
-            <button className="accion-card nueva-revision">
-              <div className="accion-icon">📝</div>
-              <h3>Nueva Revisión</h3>
-              <p>Registrar inspección de colmena</p>
-            </button>
-
-            <button className="accion-card nuevo-apiario">
-              <div className="accion-icon">🏡</div>
-              <h3>Nuevo Apiario</h3>
-              <p>Agregar ubicación de colmenas</p>
-            </button>
-
-            <button className="accion-card nueva-colmena">
-              <div className="accion-icon">🍯</div>
-              <h3>Nueva Colmena</h3>
-              <p>Registrar nueva colonia</p>
-            </button>
-
-            <button className="accion-card reportes">
-              <div className="accion-icon">📊</div>
-              <h3>Ver Reportes</h3>
-              <p>Análisis y estadísticas</p>
-            </button>
-          </div>
-        </div>
-
-        {/* Alertas y Notificaciones */}
-        <div className="content-section">
-          <div className="section-header">
-            <h2>🔔 Alertas y Recordatorios</h2>
-          </div>
-          
-          <div className="alertas-container">
-            <div className="alerta warning">
-              <div className="alerta-icon">⚠️</div>
-              <div className="alerta-content">
-                <h4>Revisión Pendiente</h4>
-                <p>Colmena "Reina Victoria" requiere revisión (último control hace 15 días)</p>
-              </div>
-              <button className="alerta-action">Ver</button>
+        <div className="card p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">
+            📊 Estadísticas de la Semana
+          </h3>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">Revisiones esta semana:</span>
+              <span className="font-semibold text-purple-600">0</span>
             </div>
-
-            <div className="alerta info">
-              <div className="alerta-icon">💡</div>
-              <div className="alerta-content">
-                <h4>Condiciones Climáticas</h4>
-                <p>Temperatura óptima para revisión hoy (22°C, viento suave)</p>
-              </div>
-              <button className="alerta-action">Ok</button>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">Nuevas colmenas:</span>
+              <span className="font-semibold text-yellow-600">0</span>
             </div>
-
-            <div className="alerta success">
-              <div className="alerta-icon">✅</div>
-              <div className="alerta-content">
-                <h4>Tratamiento Completado</h4>
-                <p>Apiario "Los Naranjos" completó tratamiento anti-varroa</p>
-              </div>
-              <button className="alerta-action">Ver</button>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">Alertas activas:</span>
+              <span className="font-semibold text-red-600">0</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">Productividad:</span>
+              <span className="font-semibold text-green-600">100%</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Clima Widget */}
-      <div className="weather-widget">
-        <div className="weather-header">
-          <h3>🌤️ Clima Actual</h3>
-          <span className="location">Coronel, Biobío</span>
-        </div>
-        <div className="weather-content">
-          <div className="temperature">18°C</div>
-          <div className="conditions">Parcialmente nublado</div>
-          <div className="details">
-            <span>💨 Viento: 12 km/h</span>
-            <span>💧 Humedad: 65%</span>
+      {/* Tips y consejos */}
+      <div className="card p-6 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200">
+        <div className="flex items-start">
+          <div className="text-2xl mr-3">💡</div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Consejo del Día
+            </h3>
+            <p className="text-gray-700">
+              La mejor hora para revisar las colmenas es entre las 10:00 AM y 2:00 PM, 
+              cuando la mayoría de las abejas pecoreadoras están fuera trabajando.
+            </p>
           </div>
         </div>
       </div>

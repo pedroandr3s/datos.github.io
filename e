@@ -1,18 +1,21 @@
-frontend/src/
+src/
 ├── components/
 │   ├── layout/
-│   │   ├── Navbar.jsx
-│   │   └── Sidebar.jsx
+│   │   ├── Navbar.js ✅
+│   │   └── Sidebar.js ✅
 │   └── common/
-├── pages/
-│   ├── Dashboard.jsx
-│   ├── Usuarios.jsx
-│   ├── Apiarios.jsx
-│   ├── Colmenas.jsx
-│   └── Revisiones.jsx
+│       ├── Loading.js ✅
+│       ├── Alert.js ✅
+│       ├── Modal.js ✅
+│       └── Card.js ✅
 ├── context/
-│   └── ApiContext.jsx
-├── utils/
-├── App.jsx
-├── main.jsx
-└── index.css
+│   └── ApiContext.js ✅
+├── pages/
+│   ├── Dashboard.js ✅
+│   ├── Usuarios.js ✅
+│   ├── Apiarios.js ✅
+│   ├── Colmenas.js ✅
+│   └── Revisiones.js ✅
+├── App.js ✅
+├── index.js ✅
+└── index.css ✅
