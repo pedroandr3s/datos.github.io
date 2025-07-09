@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 3001;
 
 // Middlewares
 app.use(cors({
-    origin: ['http://localhost:3000', 'https://tu-frontend-url.com'],
+    origin: ['http://localhost:3000', 'https://datos-github-io-gamma.vercel.app/'],
     credentials: true
 }));
 app.use(express.json());
