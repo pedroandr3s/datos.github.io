@@ -1,0 +1,155 @@
+# SmartBee - Estructura del Proyecto
+
+## 📁 Estructura de Carpetas
+
+```
+smartbee/
+├── backend/
+│   ├── config/*
+│   │   └── database.js*
+│   ├── controllers/
+│   │   ├── usuarioController.js
+│   │   ├── apiarioController.js
+│   │   ├── colmenaController.js
+│   │   └── revisionController.js
+│   ├── models/*
+│   │   ├── Usuario.js*
+│   │   ├── Apiario.js*
+│   │   ├── Colmena.js*
+│   │   └── Revision.js*
+│   ├── routes/*
+│   │   ├── usuarios.js*
+│   │   ├── apiarios.js*
+│   │   ├── colmenas.js*
+│   │   └── revisiones.js*
+│   ├── middleware/
+│   │   └── auth.js
+│   ├── package.json*
+│   └── server.js*
+├── frontend/
+│   ├── public/
+│   │   └── index.html
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── common/*
+│   │   │   │   ├── Header.js*
+│   │   │   │   ├── Sidebar.js*
+│   │   │   │   └── Layout.js*
+│   │   │   ├── perfil/*
+│   │   │   │   └── PerfilUsuario.js*
+│   │   │   ├── apiarios/
+│   │   │   │   ├── ListaApiarios.js-
+│   │   │   │   └── FormularioApiario.js*
+│   │   │   ├── colmenas/*
+│   │   │   │   ├── ListaColmenas.js*
+│   │   │   │   ├── FormularioColmena.js*
+│   │   │   │   └── DetalleColmena.js*
+│   │   │   ├── revisiones/*
+│   │   │   │   └── FormularioRevision.js*
+│   │   │   └── graficos/*
+│   │   │       ├── GraficoTemperatura.js*
+│   │   │       ├── GraficoHumedad.js*
+│   │   │       └── GraficoPeso.js*
+│   │   ├── pages/
+│   │   │   ├── Dashboard.js*
+│   │   │   ├── Perfil.js*
+│   │   │   ├── Apiarios.js*
+│   │   │   └── Colmenas.js
+│   │   ├── services/
+│   │   │   └── api.js
+│   │   ├── hooks/*
+│   │   │   └── useApi.js*
+│   │   ├── styles/*
+│   │   │   └── global.css*
+│   │   ├── App.js*
+│   │   └── index.js
+│   ├── package.json
+│   └── README.md
+└── README.md
+```
+
+## 🚀 Pasos de Instalación
+
+### 1. Backend
+```bash
+cd backend
+npm init -y
+npm install express mysql2 cors dotenv bcryptjs jsonwebtoken
+npm install -D nodemon
+```
+
+### 2. Frontend
+```bash
+cd frontend
+npx create-react-app .
+npm install axios react-router-dom chart.js react-chartjs-2 @fortawesome/react-fontawesome @fortawesome/free-solid-svg-icons
+```
+
+## 🗄️ Configuración de Base de Datos
+
+Asegúrate de que tu base de datos `smartbee` en MariaDB tenga las siguientes tablas:
+
+- `rol`
+- `usuario`
+- `colmena`
+- `colmena_ubicacion`
+- `nodo_tipo`
+- `nodo`
+- `nodo_colmena`
+- `nodo_ubicacion`
+
+## 🔧 Variables de Entorno
+
+Crear archivo `.env` en la carpeta `backend/`:
+
+```env
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=smartbee
+DB_PORT=3306
+JWT_SECRET=tu_clave_secreta_aqui
+PORT=3001
+```
+
+## 📱 Características Principales
+
+### Frontend (React)
+- Dashboard principal
+- Gestión de perfil de usuario
+- CRUD de apiarios
+- CRUD de colmenas
+- Formularios de revisión
+- Gráficos interactivos (temperatura, humedad, peso)
+- Responsive design
+- Navegación por rutas
+
+### Backend (Node.js + Express)
+- API RESTful
+- Conexión a MariaDB
+- Autenticación JWT
+- CRUD completo para todas las entidades
+- Middleware de validación
+- Manejo de errores
+
+### Base de Datos (MariaDB)
+- Esquema relacional optimizado
+- Claves foráneas
+- Índices para consultas eficientes
+- Datos de prueba
+
+## 🎨 Diseño Visual
+- Interfaz limpia tipo dashboard
+- Colores suaves y amigables
+- Iconos relacionados con apicultura
+- Campos de formulario grandes y accesibles
+- Navegación intuitiva
+- Responsive para móviles
+
+## 📊 Funcionalidades de Gráficos
+- Temperatura interna/externa
+- Humedad interna/externa  
+- Peso total de colmenas
+- Filtros por período: diario, semanal, mensual, anual
+- Exportación de datos
+- Zoom y navegación en gráficos
