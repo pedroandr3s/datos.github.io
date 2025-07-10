@@ -1,5 +1,4 @@
-import React, { useEffect } from 'react';
-import { X } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
 
 const Modal = ({ 
   isOpen, 
@@ -9,167 +8,289 @@ const Modal = ({
   size = 'md',
   showCloseButton = true,
   closeOnOverlayClick = true,
+  closeOnEscape = true,
   className = ''
 }) => {
+  const modalRef = useRef(null);
+  const firstFocusableRef = useRef(null);
+
   const sizeClasses = {
-    sm: 'max-w-md',
-    md: 'max-w-lg',
-    lg: 'max-w-2xl',
-    xl: 'max-w-4xl',
-    full: 'max-w-7xl'
+    sm: { maxWidth: '400px' },
+    md: { maxWidth: '600px' },
+    lg: { maxWidth: '800px' },
+    xl: { maxWidth: '1200px' },
+    full: { maxWidth: '95vw', maxHeight: '95vh' }
   };
 
-  // Cerrar con tecla Escape
   useEffect(() => {
-    const handleEscape = (event) => {
-      if (event.key === 'Escape' && isOpen) {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      
+      // Focus en el primer elemento focuseable
+      setTimeout(() => {
+        if (firstFocusableRef.current) {
+          firstFocusableRef.current.focus();
+        } else if (modalRef.current) {
+          const focusableElements = modalRef.current.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          );
+          if (focusableElements.length > 0) {
+            focusableElements[0].focus();
+          }
+        }
+      }, 100);
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && isOpen && closeOnEscape) {
         onClose();
       }
     };
 
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden'; // Prevenir scroll del body
-    }
+    const handleTab = (e) => {
+      if (!isOpen || !modalRef.current) return;
 
+      const focusableElements = modalRef.current.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (e.key === 'Tab') {
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    document.addEventListener('keydown', handleTab);
+    
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
+      document.removeEventListener('keydown', handleTab);
     };
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
+  }, [isOpen, closeOnEscape, onClose]);
 
   const handleOverlayClick = (e) => {
-    if (closeOnOverlayClick && e.target === e.currentTarget) {
+    if (e.target === e.currentTarget && closeOnOverlayClick) {
       onClose();
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Overlay */}
-      <div 
-        className="fixed inset-0 bg-gray-900 bg-opacity-50 transition-opacity duration-300"
-        onClick={handleOverlayClick}
-      >
-        {/* Modal Container */}
-        <div className="flex min-h-full items-center justify-center p-4">
-          <div 
-            className={`
-              relative w-full ${sizeClasses[size]} 
-              bg-white rounded-xl shadow-2xl 
-              transform transition-all duration-300 
-              animate-modal-enter
-              ${className}
-            `}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            {(title || showCloseButton) && (
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                {title && (
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {title}
-                  </h3>
-                )}
-                
-                {showCloseButton && (
-                  <button
-                    onClick={onClose}
-                    className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100"
-                    aria-label="Cerrar modal"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                )}
-              </div>
-            )}
+  if (!isOpen) return null;
 
-            {/* Content */}
-            <div className="p-6">
-              {children}
-            </div>
+  return (
+    <div 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '1rem',
+        animation: 'fadeIn 0.2s ease-out'
+      }}
+      onClick={handleOverlayClick}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={title ? "modal-title" : undefined}
+    >
+      <div 
+        ref={modalRef}
+        className={className}
+        style={{
+          backgroundColor: 'white',
+          borderRadius: '0.5rem',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          width: '100%',
+          ...sizeClasses[size],
+          maxHeight: '90vh',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          animation: 'slideIn 0.3s ease-out'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        {(title || showCloseButton) && (
+          <div style={{
+            padding: '1.5rem 1.5rem 1rem',
+            borderBottom: '1px solid #e5e7eb',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexShrink: 0
+          }}>
+            {title && (
+              <h3 
+                id="modal-title"
+                style={{
+                  fontSize: '1.125rem',
+                  fontWeight: '600',
+                  color: '#1f2937',
+                  margin: 0
+                }}
+              >
+                {title}
+              </h3>
+            )}
+            {showCloseButton && (
+              <button
+                ref={!title ? firstFocusableRef : null}
+                onClick={onClose}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '1.5rem',
+                  color: '#6b7280',
+                  padding: '0.25rem',
+                  borderRadius: '0.25rem',
+                  lineHeight: '1',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.color = '#374151';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#6b7280';
+                }}
+                aria-label="Cerrar modal"
+              >
+                ×
+              </button>
+            )}
           </div>
+        )}
+
+        {/* Body */}
+        <div style={{
+          padding: '1.5rem',
+          flex: 1,
+          overflow: 'auto'
+        }}>
+          {children}
         </div>
       </div>
 
-      <style jsx>{`
-        @keyframes modal-enter {
-          from {
-            opacity: 0;
-            transform: scale(0.95) translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         
-        .animate-modal-enter {
-          animation: modal-enter 0.3s ease-out;
+        @keyframes slideIn {
+          from { 
+            opacity: 0;
+            transform: translateY(-50px) scale(0.95);
+          }
+          to { 
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
         }
       `}</style>
     </div>
   );
 };
 
-// Componente de confirmación
+// Componente para confirmación
 export const ConfirmModal = ({ 
   isOpen, 
   onClose, 
   onConfirm, 
-  title = '¿Estás seguro?',
-  message = 'Esta acción no se puede deshacer.',
+  title = 'Confirmar acción',
+  message = '¿Estás seguro de que deseas continuar?',
   confirmText = 'Confirmar',
   cancelText = 'Cancelar',
-  type = 'danger' // 'danger', 'warning', 'success', 'info'
+  type = 'warning' // 'warning', 'danger', 'info'
 }) => {
-  const typeStyles = {
-    danger: {
-      button: 'bg-red-600 hover:bg-red-700 text-white',
-      icon: '⚠️'
-    },
-    warning: {
-      button: 'bg-yellow-600 hover:bg-yellow-700 text-white',
-      icon: '⚠️'
-    },
-    success: {
-      button: 'bg-green-600 hover:bg-green-700 text-white',
-      icon: '✅'
-    },
-    info: {
-      button: 'bg-blue-600 hover:bg-blue-700 text-white',
-      icon: 'ℹ️'
+  const getConfirmButtonClass = () => {
+    switch (type) {
+      case 'danger':
+        return 'btn btn-danger';
+      case 'info':
+        return 'btn btn-primary';
+      default:
+        return 'btn btn-warning';
     }
   };
 
-  const style = typeStyles[type] || typeStyles.danger;
+  const getIcon = () => {
+    switch (type) {
+      case 'danger':
+        return '⚠️';
+      case 'info':
+        return 'ℹ️';
+      default:
+        return '❓';
+    }
+  };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="sm">
-      <div className="text-center">
-        <div className="text-4xl mb-4">{style.icon}</div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          {title}
-        </h3>
-        <p className="text-gray-600 mb-6">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={title}
+      size="sm"
+    >
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ 
+          fontSize: '3rem', 
+          marginBottom: '1rem' 
+        }}>
+          {getIcon()}
+        </div>
+        
+        <p style={{ 
+          marginBottom: '2rem',
+          color: '#6b7280',
+          lineHeight: '1.5'
+        }}>
           {message}
         </p>
         
-        <div className="flex space-x-3 justify-center">
+        <div className="flex flex-gap flex-center">
           <button
+            className="btn btn-secondary"
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            style={{ minWidth: '100px' }}
           >
             {cancelText}
           </button>
           <button
+            className={getConfirmButtonClass()}
             onClick={() => {
               onConfirm();
               onClose();
             }}
-            className={`px-4 py-2 rounded-lg transition-colors ${style.button}`}
+            style={{ minWidth: '100px' }}
           >
             {confirmText}
           </button>

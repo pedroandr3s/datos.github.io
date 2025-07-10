@@ -24,7 +24,7 @@ const getBaseURL = () => {
   }
   
   // En producción, usa tu URL de Railway
-  return 'https://tu-backend.railway.app/api'; // ⚠️ CAMBIA ESTA URL
+  return 'https://backend-production-6c78.up.railway.app/'; // ⚠️ CAMBIA ESTA URL
 };
 
 // Configuración de axios para conectar al backend
@@ -157,44 +157,66 @@ export const ApiProvider = ({ children }) => {
     }
   };
 
-  // Métodos específicos para cada entidad
+  // Métodos específicos para cada entidad basados en el esquema de BD
   const usuarios = {
     getAll: () => apiRequest('get', '/usuarios'),
     getById: (id) => apiRequest('get', `/usuarios/${id}`),
     create: (data) => apiRequest('post', '/usuarios', data),
     update: (id, data) => apiRequest('put', `/usuarios/${id}`, data),
     delete: (id) => apiRequest('delete', `/usuarios/${id}`),
+    login: (clave) => apiRequest('post', '/usuarios/login', { clave }),
   };
 
-  const apiarios = {
-    getAll: () => apiRequest('get', '/apiarios'),
-    getById: (id) => apiRequest('get', `/apiarios/${id}`),
-    create: (data) => apiRequest('post', '/apiarios', data),
-    update: (id, data) => apiRequest('put', `/apiarios/${id}`, data),
-    delete: (id) => apiRequest('delete', `/apiarios/${id}`),
-    getEstadisticas: (id) => apiRequest('get', `/apiarios/${id}/estadisticas`),
+  const roles = {
+    getAll: () => apiRequest('get', '/roles'),
+    getById: (id) => apiRequest('get', `/roles/${id}`),
+    create: (data) => apiRequest('post', '/roles', data),
+    update: (id, data) => apiRequest('put', `/roles/${id}`, data),
+    delete: (id) => apiRequest('delete', `/roles/${id}`),
   };
 
   const colmenas = {
     getAll: () => apiRequest('get', '/colmenas'),
     getById: (id) => apiRequest('get', `/colmenas/${id}`),
-    getActivas: () => apiRequest('get', '/colmenas/activas'),
     create: (data) => apiRequest('post', '/colmenas', data),
     update: (id, data) => apiRequest('put', `/colmenas/${id}`, data),
     delete: (id) => apiRequest('delete', `/colmenas/${id}`),
-    getSensores: (id) => apiRequest('get', `/colmenas/${id}/sensores`),
-    getEstadisticas: (id) => apiRequest('get', `/colmenas/${id}/estadisticas`),
+    getByDueno: (duenoId) => apiRequest('get', `/colmenas/dueno/${duenoId}`),
+    getUbicaciones: (id) => apiRequest('get', `/colmenas/${id}/ubicaciones`),
+    addUbicacion: (id, data) => apiRequest('post', `/colmenas/${id}/ubicaciones`, data),
+    getNodos: (id) => apiRequest('get', `/colmenas/${id}/nodos`),
+    addNodo: (id, data) => apiRequest('post', `/colmenas/${id}/nodos`, data),
+    removeNodo: (colmenaId, nodoId) => apiRequest('delete', `/colmenas/${colmenaId}/nodos/${nodoId}`),
   };
 
-  const revisiones = {
-    getAll: () => apiRequest('get', '/revisiones'),
-    getById: (id) => apiRequest('get', `/revisiones/${id}`),
-    create: (data) => apiRequest('post', '/revisiones', data),
-    update: (id, data) => apiRequest('put', `/revisiones/${id}`, data),
-    delete: (id) => apiRequest('delete', `/revisiones/${id}`),
-    getByColmena: (colmenaId) => apiRequest('get', `/revisiones/colmena/${colmenaId}`),
-    getResumen: (colmenaId) => apiRequest('get', `/revisiones/resumen/${colmenaId}`),
-    getAlertas: (colmenaId) => apiRequest('get', `/revisiones/alertas/${colmenaId}`),
+  const nodos = {
+    getAll: () => apiRequest('get', '/nodos'),
+    getById: (id) => apiRequest('get', `/nodos/${id}`),
+    create: (data) => apiRequest('post', '/nodos', data),
+    update: (id, data) => apiRequest('put', `/nodos/${id}`, data),
+    delete: (id) => apiRequest('delete', `/nodos/${id}`),
+    getByTipo: (tipo) => apiRequest('get', `/nodos/tipo/${tipo}`),
+    getUbicaciones: (id) => apiRequest('get', `/nodos/${id}/ubicaciones`),
+    addUbicacion: (id, data) => apiRequest('post', `/nodos/${id}/ubicaciones`, data),
+    getMensajes: (id, limit = 100) => apiRequest('get', `/nodos/${id}/mensajes?limit=${limit}`),
+  };
+
+  const nodoTipos = {
+    getAll: () => apiRequest('get', '/nodo-tipos'),
+    getById: (id) => apiRequest('get', `/nodo-tipos/${id}`),
+    create: (data) => apiRequest('post', '/nodo-tipos', data),
+    update: (id, data) => apiRequest('put', `/nodo-tipos/${id}`, data),
+    delete: (id) => apiRequest('delete', `/nodo-tipos/${id}`),
+  };
+
+  const mensajes = {
+    getAll: (limit = 100) => apiRequest('get', `/mensajes?limit=${limit}`),
+    getById: (id) => apiRequest('get', `/mensajes/${id}`),
+    create: (data) => apiRequest('post', '/mensajes', data),
+    getByNodo: (nodoId, limit = 100) => apiRequest('get', `/mensajes/nodo/${nodoId}?limit=${limit}`),
+    getByTopico: (topico, limit = 100) => apiRequest('get', `/mensajes/topico/${topico}?limit=${limit}`),
+    getRecientes: (hours = 24) => apiRequest('get', `/mensajes/recientes?hours=${hours}`),
+    delete: (id) => apiRequest('delete', `/mensajes/${id}`),
   };
 
   const dashboard = {
@@ -202,13 +224,26 @@ export const ApiProvider = ({ children }) => {
     getRecent: () => apiRequest('get', '/dashboard/recent'),
     getAlertas: () => apiRequest('get', '/dashboard/alertas'),
     getGraficos: () => apiRequest('get', '/dashboard/graficos'),
+    getMonitoreo: () => apiRequest('get', '/dashboard/monitoreo'),
   };
 
   const selects = {
     usuarios: () => apiRequest('get', '/select/usuarios', null, false),
-    apiarios: () => apiRequest('get', '/select/apiarios', null, false),
-    colmenas: () => apiRequest('get', '/select/colmenas', null, false),
     roles: () => apiRequest('get', '/select/roles', null, false),
+    colmenas: () => apiRequest('get', '/select/colmenas', null, false),
+    nodos: () => apiRequest('get', '/select/nodos', null, false),
+    nodoTipos: () => apiRequest('get', '/select/nodo-tipos', null, false),
+  };
+
+  // Métodos para reportes y análisis
+  const reportes = {
+    temperaturas: (colmenaId, fechaInicio, fechaFin) => 
+      apiRequest('get', `/reportes/temperaturas/${colmenaId}?inicio=${fechaInicio}&fin=${fechaFin}`),
+    humedad: (colmenaId, fechaInicio, fechaFin) => 
+      apiRequest('get', `/reportes/humedad/${colmenaId}?inicio=${fechaInicio}&fin=${fechaFin}`),
+    actividad: (colmenaId, fechaInicio, fechaFin) => 
+      apiRequest('get', `/reportes/actividad/${colmenaId}?inicio=${fechaInicio}&fin=${fechaFin}`),
+    resumen: (colmenaId) => apiRequest('get', `/reportes/resumen/${colmenaId}`),
   };
 
   const value = {
@@ -222,10 +257,13 @@ export const ApiProvider = ({ children }) => {
     
     // Entidades principales
     usuarios,
-    apiarios,
+    roles,
     colmenas,
-    revisiones,
+    nodos,
+    nodoTipos,
+    mensajes,
     dashboard,
+    reportes,
     selects,
     
     // Método genérico

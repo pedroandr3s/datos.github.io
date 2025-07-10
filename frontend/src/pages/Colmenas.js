@@ -1,320 +1,610 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Plus, Calendar, User, Home, RefreshCw } from 'lucide-react';
 import { useApi } from '../context/ApiContext';
+import Card from '../components/common/Card';
+import Loading from '../components/common/Loading';
+import Alert from '../components/common/Alert';
+import Modal from '../components/common/Modal';
 
 const Colmenas = () => {
-  const { colmenas, selects, loading, error } = useApi();
+  const { colmenas, usuarios, nodos, mensajes, loading, error } = useApi();
   const [colmenasList, setColmenasList] = useState([]);
   const [usuariosList, setUsuariosList] = useState([]);
-  const [apiariosList, setApiariosList] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [nodosList, setNodosList] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [editingColmena, setEditingColmena] = useState(null);
+  const [selectedColmena, setSelectedColmena] = useState(null);
+  const [colmenaDetail, setColmenaDetail] = useState(null);
+  const [alertMessage, setAlertMessage] = useState(null);
   const [formData, setFormData] = useState({
-    nombre: '',
-    tipo: 'Langstroth',
     descripcion: '',
     dueno: '',
-    apiario_id: ''
+    latitud: '',
+    longitud: '',
+    ubicacion_descripcion: '',
+    comuna: ''
   });
+  const [formErrors, setFormErrors] = useState({});
 
   useEffect(() => {
-    loadColmenas();
-    loadSelectData();
+    loadData();
   }, []);
 
-  const loadColmenas = async () => {
-    setRefreshing(true);
+  const loadData = async () => {
     try {
-      const data = await colmenas.getAll();
-      setColmenasList(data);
+      const [colmenasData, usuariosData, nodosData] = await Promise.all([
+        colmenas.getAll(),
+        usuarios.getAll(),
+        nodos.getAll()
+      ]);
+      setColmenasList(colmenasData);
+      setUsuariosList(usuariosData);
+      setNodosList(nodosData);
     } catch (err) {
-      console.error('Error cargando colmenas:', err);
-    } finally {
-      setRefreshing(false);
+      console.error('Error cargando datos:', err);
+      setAlertMessage({
+        type: 'error',
+        message: 'Error al cargar los datos de colmenas'
+      });
     }
   };
 
-  const loadSelectData = async () => {
+  const loadColmenaDetail = async (colmenaId) => {
     try {
-      const [usuariosData, apiariosData] = await Promise.all([
-        selects.usuarios(),
-        selects.apiarios()
+      const [colmenaData, nodosData, mensajesData] = await Promise.all([
+        colmenas.getById(colmenaId),
+        colmenas.getNodos(colmenaId).catch(() => []),
+        mensajes.getByNodo ? [] : [] // Ajustar según disponibilidad
       ]);
-      setUsuariosList(usuariosData);
-      setApiariosList(apiariosData);
+      
+      setColmenaDetail({
+        ...colmenaData,
+        nodos: nodosData,
+        mensajesRecientes: mensajesData
+      });
     } catch (err) {
-      console.error('Error cargando datos para selects:', err);
+      console.error('Error cargando detalle:', err);
+      setAlertMessage({
+        type: 'error',
+        message: 'Error al cargar el detalle de la colmena'
+      });
     }
+  };
+
+  const handleOpenModal = (colmena = null) => {
+    if (colmena) {
+      setEditingColmena(colmena);
+      setFormData({
+        descripcion: colmena.descripcion || '',
+        dueno: colmena.dueno || '',
+        latitud: colmena.latitud || '',
+        longitud: colmena.longitud || '',
+        ubicacion_descripcion: colmena.ubicacion_descripcion || '',
+        comuna: colmena.comuna || ''
+      });
+    } else {
+      setEditingColmena(null);
+      setFormData({
+        descripcion: '',
+        dueno: '',
+        latitud: '',
+        longitud: '',
+        ubicacion_descripcion: '',
+        comuna: ''
+      });
+    }
+    setFormErrors({});
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingColmena(null);
+    setFormData({
+      descripcion: '',
+      dueno: '',
+      latitud: '',
+      longitud: '',
+      ubicacion_descripcion: '',
+      comuna: ''
+    });
+    setFormErrors({});
+  };
+
+  const handleOpenDetailModal = async (colmena) => {
+    setSelectedColmena(colmena);
+    setIsDetailModalOpen(true);
+    await loadColmenaDetail(colmena.id);
+  };
+
+  const handleCloseDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedColmena(null);
+    setColmenaDetail(null);
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    
+    if (!formData.descripcion.trim()) {
+      errors.descripcion = 'La descripción es requerida';
+    }
+    
+    if (!formData.dueno) {
+      errors.dueno = 'El dueño es requerido';
+    }
+
+    if (formData.latitud && (isNaN(formData.latitud) || formData.latitud < -90 || formData.latitud > 90)) {
+      errors.latitud = 'Latitud debe ser un número entre -90 y 90';
+    }
+
+    if (formData.longitud && (isNaN(formData.longitud) || formData.longitud < -180 || formData.longitud > 180)) {
+      errors.longitud = 'Longitud debe ser un número entre -180 y 180';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.dueno) {
-      alert('Debe seleccionar un propietario');
+    
+    if (!validateForm()) {
       return;
     }
-    
+
     try {
-      await colmenas.create(formData);
-      setFormData({
-        nombre: '',
-        tipo: 'Langstroth',
-        descripcion: '',
-        dueno: '',
-        apiario_id: ''
-      });
-      setShowForm(false);
-      loadColmenas();
-      alert('Colmena creada exitosamente');
+      const colmenaData = {
+        descripcion: formData.descripcion,
+        dueno: parseInt(formData.dueno)
+      };
+
+      let colmenaId;
+      
+      if (editingColmena) {
+        await colmenas.update(editingColmena.id, colmenaData);
+        colmenaId = editingColmena.id;
+        setAlertMessage({
+          type: 'success',
+          message: 'Colmena actualizada correctamente'
+        });
+      } else {
+        const nuevaColmena = await colmenas.create(colmenaData);
+        colmenaId = nuevaColmena.id;
+        setAlertMessage({
+          type: 'success',
+          message: 'Colmena creada correctamente'
+        });
+      }
+
+      // Si hay datos de ubicación, agregarlos
+      if (formData.latitud && formData.longitud) {
+        const ubicacionData = {
+          latitud: parseFloat(formData.latitud),
+          longitud: parseFloat(formData.longitud),
+          descripcion: formData.ubicacion_descripcion,
+          comuna: formData.comuna
+        };
+        
+        try {
+          await colmenas.addUbicacion(colmenaId, ubicacionData);
+        } catch (ubicErr) {
+          console.warn('Error agregando ubicación:', ubicErr);
+        }
+      }
+      
+      handleCloseModal();
+      loadData();
     } catch (err) {
-      alert('Error al crear colmena: ' + (err.response?.data?.error || err.message));
+      console.error('Error guardando colmena:', err);
+      setAlertMessage({
+        type: 'error',
+        message: `Error al ${editingColmena ? 'actualizar' : 'crear'} la colmena`
+      });
     }
   };
 
-  const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
+  const handleDelete = async (colmenaId, descripcion) => {
+    if (window.confirm(`¿Estás seguro de que deseas eliminar la colmena "${descripcion}"?`)) {
+      try {
+        await colmenas.delete(colmenaId);
+        setAlertMessage({
+          type: 'success',
+          message: 'Colmena eliminada correctamente'
+        });
+        loadData();
+      } catch (err) {
+        console.error('Error eliminando colmena:', err);
+        setAlertMessage({
+          type: 'error',
+          message: 'Error al eliminar la colmena'
+        });
+      }
+    }
+  };
+
+  const getDuenoName = (duenoId) => {
+    const usuario = usuariosList.find(u => u.id === duenoId);
+    return usuario ? `${usuario.nombre} ${usuario.apellido}` : 'Sin asignar';
+  };
+
+  const formatearFecha = (fecha) => {
+    return new Date(fecha).toLocaleString('es-CL', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
-  const getStatusColor = (estado) => {
-    return estado === 'activa' 
-      ? 'bg-green-100 text-green-800' 
-      : 'bg-red-100 text-red-800';
-  };
+  if (loading && colmenasList.length === 0) {
+    return <Loading message="Cargando colmenas..." />;
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-            <Package className="h-8 w-8 mr-3 text-bee-yellow" />
-            Gestión de Colmenas
-          </h1>
-          <p className="text-gray-600 mt-1">Administra tus colmenas y su estado</p>
-        </div>
-        
-        <div className="flex space-x-3">
-          <button
-            onClick={loadColmenas}
-            disabled={refreshing}
-            className="flex items-center px-4 py-2 bg-bee-green text-white rounded-lg hover:bg-opacity-90 disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Actualizar
-          </button>
-          
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="flex items-center px-4 py-2 bg-bee-yellow text-white rounded-lg hover:bg-bee-orange transition-colors"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nueva Colmena
-          </button>
-        </div>
+    <div>
+      <div className="flex flex-between flex-center mb-6">
+        <h1 className="page-title" style={{ margin: 0 }}>Colmenas</h1>
+        <button 
+          className="btn btn-primary"
+          onClick={() => handleOpenModal()}
+        >
+          + Nueva Colmena
+        </button>
       </div>
 
-      {/* Error message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">{error}</p>
-        </div>
+      {alertMessage && (
+        <Alert 
+          type={alertMessage.type}
+          message={alertMessage.message}
+          onClose={() => setAlertMessage(null)}
+        />
       )}
 
-      {/* Formulario */}
-      {showForm && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Crear Nueva Colmena</h2>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre de la Colmena *
-                </label>
-                <input
-                  type="text"
-                  name="nombre"
-                  value={formData.nombre}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-bee-yellow focus:border-transparent"
-                  placeholder="Ej: Colmena 001"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tipo de Colmena
-                </label>
-                <select
-                  name="tipo"
-                  value={formData.tipo}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-bee-yellow focus:border-transparent"
-                >
-                  <option value="Langstroth">Langstroth</option>
-                  <option value="Top Bar">Top Bar</option>
-                  <option value="Warre">Warré</option>
-                  <option value="Kenyan">Kenyan</option>
-                </select>
-              </div>
-            </div>
+      <Card title="Lista de Colmenas">
+        {colmenasList.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🏠</div>
+            <h3 style={{ marginBottom: '0.5rem', color: '#374151' }}>
+              No hay colmenas registradas
+            </h3>
+            <p>Comienza agregando tu primera colmena</p>
+            <button 
+              className="btn btn-primary mt-4"
+              onClick={() => handleOpenModal()}
+            >
+              Crear Colmena
+            </button>
+          </div>
+        ) : (
+          <div style={{ overflow: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Descripción</th>
+                  <th>Dueño</th>
+                  <th>Ubicación</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {colmenasList.map((colmena) => (
+                  <tr key={colmena.id}>
+                    <td>
+                      <span style={{ 
+                        fontWeight: '600', 
+                        color: '#374151' 
+                      }}>
+                        #{colmena.id}
+                      </span>
+                    </td>
+                    <td>
+                      <div>
+                        <div style={{ fontWeight: '500' }}>
+                          {colmena.descripcion || 'Sin descripción'}
+                        </div>
+                        <div style={{ 
+                          fontSize: '0.875rem', 
+                          color: '#6b7280' 
+                        }}>
+                          Colmena ID: {colmena.id}
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: '500' }}>
+                        {getDuenoName(colmena.dueno)}
+                      </div>
+                    </td>
+                    <td>
+                      {colmena.comuna ? (
+                        <div>
+                          <div style={{ fontWeight: '500' }}>{colmena.comuna}</div>
+                          {colmena.latitud && colmena.longitud && (
+                            <div style={{ 
+                              fontSize: '0.75rem', 
+                              color: '#6b7280' 
+                            }}>
+                              {colmena.latitud.toFixed(4)}, {colmena.longitud.toFixed(4)}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ color: '#6b7280' }}>Sin ubicación</span>
+                      )}
+                    </td>
+                    <td>
+                      <span className="badge badge-success">
+                        Activa
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex flex-gap">
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleOpenDetailModal(colmena)}
+                        >
+                          👁️ Ver
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleOpenModal(colmena)}
+                        >
+                          ✏️ Editar
+                        </button>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() => handleDelete(colmena.id, colmena.descripcion)}
+                        >
+                          🗑️ Eliminar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Propietario *
-                </label>
-                <select
-                  name="dueno"
-                  value={formData.dueno}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-bee-yellow focus:border-transparent"
-                >
-                  <option value="">Seleccionar propietario...</option>
-                  {usuariosList.map(usuario => (
-                    <option key={usuario.id} value={usuario.id}>
-                      {usuario.nombre} {usuario.apellido}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Apiario
-                </label>
-                <select
-                  name="apiario_id"
-                  value={formData.apiario_id}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-bee-yellow focus:border-transparent"
-                >
-                  <option value="">Sin asignar</option>
-                  {apiariosList.map(apiario => (
-                    <option key={apiario.id} value={apiario.id}>
-                      {apiario.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Descripción
-              </label>
+      {/* Modal para crear/editar colmena */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        title={editingColmena ? 'Editar Colmena' : 'Nueva Colmena'}
+        size="lg"
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="grid grid-2">
+            <div className="form-group">
+              <label className="form-label">Descripción *</label>
               <textarea
-                name="descripcion"
+                className="form-textarea"
                 value={formData.descripcion}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-bee-yellow focus:border-transparent"
-                placeholder="Describe las características de la colmena..."
+                onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
+                placeholder="Describe la colmena"
+                rows="3"
+              />
+              {formErrors.descripcion && (
+                <div className="error-message">{formErrors.descripcion}</div>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Dueño *</label>
+              <select
+                className="form-select"
+                value={formData.dueno}
+                onChange={(e) => setFormData({...formData, dueno: e.target.value})}
+              >
+                <option value="">Selecciona un dueño</option>
+                {usuariosList.map((usuario) => (
+                  <option key={usuario.id} value={usuario.id}>
+                    {usuario.nombre} {usuario.apellido}
+                  </option>
+                ))}
+              </select>
+              {formErrors.dueno && (
+                <div className="error-message">{formErrors.dueno}</div>
+              )}
+            </div>
+          </div>
+
+          <h4 style={{ 
+            marginTop: '2rem', 
+            marginBottom: '1rem',
+            fontSize: '1rem',
+            fontWeight: '600',
+            color: '#374151'
+          }}>
+            Ubicación (Opcional)
+          </h4>
+
+          <div className="grid grid-2">
+            <div className="form-group">
+              <label className="form-label">Latitud</label>
+              <input
+                type="number"
+                step="any"
+                className="form-input"
+                value={formData.latitud}
+                onChange={(e) => setFormData({...formData, latitud: e.target.value})}
+                placeholder="-36.606111"
+              />
+              {formErrors.latitud && (
+                <div className="error-message">{formErrors.latitud}</div>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Longitud</label>
+              <input
+                type="number"
+                step="any"
+                className="form-input"
+                value={formData.longitud}
+                onChange={(e) => setFormData({...formData, longitud: e.target.value})}
+                placeholder="-72.103611"
+              />
+              {formErrors.longitud && (
+                <div className="error-message">{formErrors.longitud}</div>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-2">
+            <div className="form-group">
+              <label className="form-label">Comuna</label>
+              <input
+                type="text"
+                className="form-input"
+                value={formData.comuna}
+                onChange={(e) => setFormData({...formData, comuna: e.target.value})}
+                placeholder="Chillán"
               />
             </div>
 
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-4 py-2 bg-bee-yellow text-white rounded-lg hover:bg-bee-orange disabled:opacity-50 transition-colors"
-              >
-                {loading ? 'Creando...' : 'Crear Colmena'}
-              </button>
+            <div className="form-group">
+              <label className="form-label">Descripción de Ubicación</label>
+              <input
+                type="text"
+                className="form-input"
+                value={formData.ubicacion_descripcion}
+                onChange={(e) => setFormData({...formData, ubicacion_descripcion: e.target.value})}
+                placeholder="Ubicada en predio agrícola"
+              />
             </div>
-          </form>
-        </div>
-      )}
+          </div>
 
-      {/* Lista de colmenas */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Colmenas Registradas ({colmenasList.length})
-          </h2>
-        </div>
-        
-        <div className="p-6">
-          {loading && colmenasList.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-bee-yellow mx-auto"></div>
-              <p className="text-gray-600 mt-2">Cargando colmenas...</p>
-            </div>
-          ) : colmenasList.length === 0 ? (
-            <div className="text-center py-8">
-              <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No hay colmenas registradas</p>
-              <p className="text-gray-500 text-sm mt-1">Crea la primera colmena para comenzar</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {colmenasList.map((colmena) => (
-                <div key={colmena.id} className="border border-gray-200 rounded-lg p-6 card-hover bg-gradient-to-br from-yellow-50 to-amber-50">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start">
-                      <div className="bg-bee-yellow bg-opacity-20 p-3 rounded-lg">
-                        <Package className="h-6 w-6 text-bee-yellow" />
-                      </div>
-                      <div className="ml-4 flex-1">
-                        <h3 className="font-semibold text-gray-900 text-lg">
-                          {colmena.nombre}
-                        </h3>
-                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-1 ${getStatusColor(colmena.estado)}`}>
-                          {colmena.estado}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-4 space-y-2">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Package className="h-4 w-4 mr-2 text-bee-orange" />
-                      Tipo: {colmena.tipo}
-                    </div>
-                    
-                    {colmena.apiario_nombre && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Home className="h-4 w-4 mr-2 text-bee-green" />
-                        {colmena.apiario_nombre}
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center text-sm text-gray-600">
-                      <User className="h-4 w-4 mr-2 text-bee-dark" />
-                      {colmena.dueno_nombre} {colmena.dueno_apellido}
-                    </div>
-                    
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Calendar className="h-4 w-4 mr-2 text-gray-500" />
-                      Instalada: {new Date(colmena.fecha_instalacion).toLocaleDateString('es-ES')}
-                    </div>
-                  </div>
+          <div className="flex flex-gap flex-between mt-6">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleCloseModal}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading}
+            >
+              {loading ? 'Guardando...' : (editingColmena ? 'Actualizar' : 'Crear')}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
-                  {colmena.descripcion && (
-                    <div className="mt-4 p-3 bg-white bg-opacity-60 rounded-lg">
-                      <p className="text-sm text-gray-700">
-                        {colmena.descripcion}
+      {/* Modal de detalle de colmena */}
+      <Modal
+        isOpen={isDetailModalOpen}
+        onClose={handleCloseDetailModal}
+        title={`Detalle de Colmena #${selectedColmena?.id}`}
+        size="xl"
+      >
+        {colmenaDetail ? (
+          <div>
+            <div className="grid grid-2 mb-6">
+              <Card title="Información General">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div>
+                    <strong>Descripción:</strong>
+                    <p style={{ margin: '0.25rem 0 0', color: '#6b7280' }}>
+                      {colmenaDetail.descripcion || 'Sin descripción'}
+                    </p>
+                  </div>
+                  <div>
+                    <strong>Dueño:</strong>
+                    <p style={{ margin: '0.25rem 0 0', color: '#6b7280' }}>
+                      {getDuenoName(colmenaDetail.dueno)}
+                    </p>
+                  </div>
+                  {colmenaDetail.comuna && (
+                    <div>
+                      <strong>Ubicación:</strong>
+                      <p style={{ margin: '0.25rem 0 0', color: '#6b7280' }}>
+                        {colmenaDetail.comuna}
+                        {colmenaDetail.latitud && colmenaDetail.longitud && (
+                          <br />
+                        )}
+                        {colmenaDetail.latitud && colmenaDetail.longitud && (
+                          <span style={{ fontSize: '0.875rem' }}>
+                            {colmenaDetail.latitud.toFixed(6)}, {colmenaDetail.longitud.toFixed(6)}
+                          </span>
+                        )}
                       </p>
                     </div>
                   )}
                 </div>
-              ))}
+              </Card>
+
+              <Card title="Estado Actual">
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🏠</div>
+                  <h3 style={{ color: '#059669', marginBottom: '0.5rem' }}>
+                    Colmena Activa
+                  </h3>
+                  <p style={{ color: '#6b7280' }}>
+                    Monitoreando {colmenaDetail.nodos?.length || 0} sensores
+                  </p>
+                </div>
+              </Card>
             </div>
-          )}
-        </div>
-      </div>
+
+            {colmenaDetail.nodos && colmenaDetail.nodos.length > 0 && (
+              <Card title="Nodos/Sensores Asociados" className="mb-6">
+                <div style={{ overflow: 'auto' }}>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Descripción</th>
+                        <th>Tipo</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {colmenaDetail.nodos.map((nodo) => (
+                        <tr key={nodo.id}>
+                          <td>#{nodo.id}</td>
+                          <td>{nodo.descripcion}</td>
+                          <td>
+                            <span className="badge badge-info">
+                              {nodo.tipo_descripcion || `Tipo ${nodo.tipo}`}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="badge badge-success">
+                              Activo
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+
+            <Card title="Actividad Reciente">
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '2rem',
+                color: '#6b7280'
+              }}>
+                <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>📊</div>
+                <p>Datos de sensores y actividad reciente aparecerán aquí</p>
+              </div>
+            </Card>
+          </div>
+        ) : (
+          <Loading message="Cargando detalle de colmena..." />
+        )}
+      </Modal>
     </div>
   );
 };

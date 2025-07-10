@@ -1,165 +1,147 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { X, BarChart3, Users, Home, Package, FileText, Settings, LogOut } from 'lucide-react';
+import { useApi } from '../../context/ApiContext';
 
-const Sidebar = ({ isOpen, onClose }) => {
-  const location = useLocation();
+const Sidebar = ({ currentPage, setCurrentPage }) => {
+  const { isConnected } = useApi();
 
   const menuItems = [
     { 
-      path: '/', 
-      name: 'Dashboard', 
-      icon: BarChart3, 
-      description: 'Resumen general',
-      color: 'text-blue-600'
+      id: 'dashboard', 
+      label: 'Dashboard', 
+      icon: '📊' 
     },
     { 
-      path: '/usuarios', 
-      name: 'Usuarios', 
-      icon: Users, 
-      description: 'Gestión de usuarios',
-      color: 'text-purple-600'
+      id: 'usuarios', 
+      label: 'Usuarios', 
+      icon: '👥' 
     },
     { 
-      path: '/apiarios', 
-      name: 'Apiarios', 
-      icon: Home, 
-      description: 'Ubicaciones de colmenas',
-      color: 'text-green-600'
+      id: 'colmenas', 
+      label: 'Colmenas', 
+      icon: '🏠' 
     },
     { 
-      path: '/colmenas', 
-      name: 'Colmenas', 
-      icon: Package, 
-      description: 'Administrar colmenas',
-      color: 'text-yellow-600'
-    },
-    { 
-      path: '/revisiones', 
-      name: 'Revisiones', 
-      icon: FileText, 
-      description: 'Registro de inspecciones',
-      color: 'text-indigo-600'
-    },
+      id: 'revisiones', 
+      label: 'Revisiones', 
+      icon: '📋' 
+    }
   ];
 
-  const isActive = (path) => location.pathname === path;
-
   return (
-    <>
-      {/* Overlay para móvil */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 md:hidden transition-opacity duration-300"
-          onClick={onClose}
-        />
-      )}
+    <div className="sidebar">
+      <div style={{ padding: '1.5rem' }}>
+        {/* Logo/Title */}
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '0.5rem', 
+          marginBottom: '2rem' 
+        }}>
+          <span style={{ fontSize: '1.5rem' }}>🐝</span>
+          <h2 style={{ 
+            fontSize: '1.25rem', 
+            fontWeight: '700', 
+            color: '#1f2937',
+            margin: 0
+          }}>
+            ApiControl
+          </h2>
+        </div>
 
-      {/* Sidebar */}
-      <aside
-        className={`fixed md:static inset-y-0 left-0 z-50 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className="flex flex-col h-full">
-          {/* Header del sidebar */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 md:hidden">
-            <div className="flex items-center">
-              <div className="text-2xl mr-2">🐝</div>
-              <h2 className="text-lg font-semibold text-gray-900">SmartBee</h2>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-              aria-label="Cerrar menú"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-            <div className="mb-6">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                Navegación Principal
-              </h3>
-              
-              {menuItems.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.path);
-                
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    onClick={onClose}
-                    className={`group flex items-start px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
-                      active
-                        ? 'bg-gradient-to-r from-bee-yellow to-bee-orange text-white shadow-lg transform scale-105'
-                        : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 hover:transform hover:scale-102'
-                    }`}
-                  >
-                    <Icon 
-                      className={`h-5 w-5 mr-3 flex-shrink-0 transition-colors ${
-                        active ? 'text-white' : item.color
-                      }`} 
-                    />
-                    <div className="flex-1">
-                      <div className="font-semibold">{item.name}</div>
-                      <div className={`text-xs mt-1 ${
-                        active ? 'text-white opacity-90' : 'text-gray-500'
-                      }`}>
-                        {item.description}
-                      </div>
-                    </div>
-                    
-                    {active && (
-                      <div className="w-2 h-2 bg-white rounded-full opacity-75"></div>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-
-            {/* Sección adicional */}
-            <div className="border-t border-gray-200 pt-6">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                Sistema
-              </h3>
-              
-              <button className="w-full flex items-center px-4 py-3 text-sm font-medium text-gray-700 rounded-xl hover:bg-gray-100 transition-colors">
-                <Settings className="h-5 w-5 mr-3 text-gray-500" />
-                <span>Configuración</span>
-              </button>
-              
-              <button className="w-full flex items-center px-4 py-3 text-sm font-medium text-gray-700 rounded-xl hover:bg-gray-100 transition-colors">
-                <LogOut className="h-5 w-5 mr-3 text-gray-500" />
-                <span>Cerrar Sesión</span>
-              </button>
-            </div>
-          </nav>
-
-          {/* Footer del sidebar */}
-          <div className="p-4 border-t border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
-            <div className="flex items-center">
-              <div className="text-3xl mr-3 animate-bounce-slow">🍯</div>
-              <div>
-                <p className="text-sm font-semibold text-gray-900">SmartBee v1.0</p>
-                <p className="text-xs text-gray-600">Sistema Apícola Inteligente</p>
-              </div>
-            </div>
-            
-            {/* Estadística rápida */}
-            <div className="mt-3 p-2 bg-white rounded-lg shadow-sm">
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-600">Estado:</span>
-                <span className="text-green-600 font-semibold">✅ Operativo</span>
-              </div>
-            </div>
+        {/* Connection Status */}
+        <div style={{ 
+          padding: '0.75rem', 
+          borderRadius: '0.5rem', 
+          marginBottom: '1.5rem',
+          backgroundColor: isConnected ? '#d1fae5' : '#fee2e2',
+          border: `1px solid ${isConnected ? '#a7f3d0' : '#fecaca'}`
+        }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '0.5rem' 
+          }}>
+            <div style={{ 
+              width: '8px', 
+              height: '8px', 
+              borderRadius: '50%', 
+              backgroundColor: isConnected ? '#059669' : '#dc2626' 
+            }} />
+            <span style={{ 
+              fontSize: '0.875rem', 
+              fontWeight: '500', 
+              color: isConnected ? '#065f46' : '#991b1b' 
+            }}>
+              {isConnected ? 'Conectado' : 'Desconectado'}
+            </span>
           </div>
         </div>
-      </aside>
-    </>
+
+        {/* Menu Items */}
+        <nav>
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setCurrentPage(item.id)}
+              style={{
+                width: '100%',
+                padding: '0.75rem 1rem',
+                marginBottom: '0.5rem',
+                border: 'none',
+                borderRadius: '0.5rem',
+                backgroundColor: currentPage === item.id ? '#3b82f6' : 'transparent',
+                color: currentPage === item.id ? 'white' : '#6b7280',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                transition: 'all 0.2s',
+                textAlign: 'left'
+              }}
+              onMouseEnter={(e) => {
+                if (currentPage !== item.id) {
+                  e.target.style.backgroundColor = '#f3f4f6';
+                  e.target.style.color = '#374151';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (currentPage !== item.id) {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#6b7280';
+                }
+              }}
+            >
+              <span style={{ fontSize: '1rem' }}>{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Footer Info */}
+        <div style={{ 
+          marginTop: '2rem', 
+          padding: '1rem',
+          borderTop: '1px solid #e5e7eb',
+          textAlign: 'center'
+        }}>
+          <div style={{ 
+            fontSize: '0.75rem', 
+            color: '#6b7280',
+            marginBottom: '0.5rem'
+          }}>
+            Sistema de Gestión Apícola
+          </div>
+          <div style={{ 
+            fontSize: '0.75rem', 
+            color: '#9ca3af'
+          }}>
+            v1.0.0
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 

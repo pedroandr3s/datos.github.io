@@ -1,269 +1,372 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Mail, Phone, Calendar, Shield, RefreshCw } from 'lucide-react';
 import { useApi } from '../context/ApiContext';
+import Card from '../components/common/Card';
+import Loading from '../components/common/Loading';
+import Alert from '../components/common/Alert';
+import Modal from '../components/common/Modal';
 
 const Usuarios = () => {
-  const { usuarios, loading, error } = useApi();
+  const { usuarios, roles, loading, error } = useApi();
   const [usuariosList, setUsuariosList] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [rolesList, setRolesList] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [alertMessage, setAlertMessage] = useState(null);
   const [formData, setFormData] = useState({
     nombre: '',
     apellido: '',
-    email: '',
-    telefono: '',
-    clave: ''
+    clave: '',
+    rol: ''
   });
+  const [formErrors, setFormErrors] = useState({});
 
   useEffect(() => {
-    loadUsuarios();
+    loadData();
   }, []);
 
-  const loadUsuarios = async () => {
-    setRefreshing(true);
+  const loadData = async () => {
     try {
-      const data = await usuarios.getAll();
-      setUsuariosList(data);
+      const [usuariosData, rolesData] = await Promise.all([
+        usuarios.getAll(),
+        roles.getAll()
+      ]);
+      setUsuariosList(usuariosData);
+      setRolesList(rolesData);
     } catch (err) {
-      console.error('Error cargando usuarios:', err);
-    } finally {
-      setRefreshing(false);
+      console.error('Error cargando datos:', err);
+      setAlertMessage({
+        type: 'error',
+        message: 'Error al cargar los datos de usuarios'
+      });
     }
+  };
+
+  const handleOpenModal = (user = null) => {
+    if (user) {
+      setEditingUser(user);
+      setFormData({
+        nombre: user.nombre,
+        apellido: user.apellido,
+        clave: '',
+        rol: user.rol
+      });
+    } else {
+      setEditingUser(null);
+      setFormData({
+        nombre: '',
+        apellido: '',
+        clave: '',
+        rol: ''
+      });
+    }
+    setFormErrors({});
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingUser(null);
+    setFormData({
+      nombre: '',
+      apellido: '',
+      clave: '',
+      rol: ''
+    });
+    setFormErrors({});
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    
+    if (!formData.nombre.trim()) {
+      errors.nombre = 'El nombre es requerido';
+    }
+    
+    if (!formData.apellido.trim()) {
+      errors.apellido = 'El apellido es requerido';
+    }
+    
+    if (!editingUser && !formData.clave.trim()) {
+      errors.clave = 'La clave es requerida';
+    }
+    
+    if (!formData.rol) {
+      errors.rol = 'El rol es requerido';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
     try {
-      await usuarios.create(formData);
-      setFormData({
-        nombre: '',
-        apellido: '',
-        email: '',
-        telefono: '',
-        clave: ''
-      });
-      setShowForm(false);
-      loadUsuarios();
-      alert('Usuario creado exitosamente');
+      const dataToSend = { ...formData };
+      
+      // Si estamos editando y no hay nueva clave, no la enviamos
+      if (editingUser && !dataToSend.clave.trim()) {
+        delete dataToSend.clave;
+      }
+
+      if (editingUser) {
+        await usuarios.update(editingUser.id, dataToSend);
+        setAlertMessage({
+          type: 'success',
+          message: 'Usuario actualizado correctamente'
+        });
+      } else {
+        await usuarios.create(dataToSend);
+        setAlertMessage({
+          type: 'success',
+          message: 'Usuario creado correctamente'
+        });
+      }
+      
+      handleCloseModal();
+      loadData();
     } catch (err) {
-      alert('Error al crear usuario: ' + (err.response?.data?.error || err.message));
+      console.error('Error guardando usuario:', err);
+      setAlertMessage({
+        type: 'error',
+        message: `Error al ${editingUser ? 'actualizar' : 'crear'} el usuario`
+      });
     }
   };
 
-  const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+  const handleDelete = async (userId, userName) => {
+    if (window.confirm(`¿Estás seguro de que deseas eliminar al usuario "${userName}"?`)) {
+      try {
+        await usuarios.delete(userId);
+        setAlertMessage({
+          type: 'success',
+          message: 'Usuario eliminado correctamente'
+        });
+        loadData();
+      } catch (err) {
+        console.error('Error eliminando usuario:', err);
+        setAlertMessage({
+          type: 'error',
+          message: 'Error al eliminar el usuario'
+        });
+      }
+    }
   };
 
+  const getRoleName = (rolId) => {
+    const rol = rolesList.find(r => r.rol === rolId);
+    return rol ? rol.descripcion : 'Sin rol';
+  };
+
+  const getRoleBadgeClass = (rolId) => {
+    switch (rolId) {
+      case 1:
+        return 'badge-danger';
+      case 2:
+        return 'badge-success';
+      case 3:
+        return 'badge-info';
+      default:
+        return 'badge-secondary';
+    }
+  };
+
+  if (loading && usuariosList.length === 0) {
+    return <Loading message="Cargando usuarios..." />;
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-            <Users className="h-8 w-8 mr-3 text-bee-yellow" />
-            Gestión de Usuarios
-          </h1>
-          <p className="text-gray-600 mt-1">Administra los usuarios del sistema</p>
-        </div>
-        
-        <div className="flex space-x-3">
-          <button
-            onClick={loadUsuarios}
-            disabled={refreshing}
-            className="flex items-center px-4 py-2 bg-bee-green text-white rounded-lg hover:bg-opacity-90 disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Actualizar
-          </button>
-          
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="flex items-center px-4 py-2 bg-bee-yellow text-white rounded-lg hover:bg-bee-orange transition-colors"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Usuario
-          </button>
-        </div>
+    <div>
+      <div className="flex flex-between flex-center mb-6">
+        <h1 className="page-title" style={{ margin: 0 }}>Usuarios</h1>
+        <button 
+          className="btn btn-primary"
+          onClick={() => handleOpenModal()}
+        >
+          + Nuevo Usuario
+        </button>
       </div>
 
-      {/* Error message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">{error}</p>
-        </div>
+      {alertMessage && (
+        <Alert 
+          type={alertMessage.type}
+          message={alertMessage.message}
+          onClose={() => setAlertMessage(null)}
+        />
       )}
 
-      {/* Formulario */}
-      {showForm && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Crear Nuevo Usuario</h2>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre *
-                </label>
-                <input
-                  type="text"
-                  name="nombre"
-                  value={formData.nombre}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-bee-yellow focus:border-transparent"
-                  placeholder="Ingrese el nombre"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Apellido *
-                </label>
-                <input
-                  type="text"
-                  name="apellido"
-                  value={formData.apellido}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-bee-yellow focus:border-transparent"
-                  placeholder="Ingrese el apellido"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-bee-yellow focus:border-transparent"
-                  placeholder="ejemplo@email.com"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Teléfono
-                </label>
-                <input
-                  type="tel"
-                  name="telefono"
-                  value={formData.telefono}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-bee-yellow focus:border-transparent"
-                  placeholder="+56 9 1234 5678"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Contraseña *
-              </label>
-              <input
-                type="password"
-                name="clave"
-                value={formData.clave}
-                onChange={handleInputChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-bee-yellow focus:border-transparent"
-                placeholder="Ingrese una contraseña segura"
-              />
-            </div>
-
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-4 py-2 bg-bee-yellow text-white rounded-lg hover:bg-bee-orange disabled:opacity-50 transition-colors"
-              >
-                {loading ? 'Creando...' : 'Crear Usuario'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Lista de usuarios */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Usuarios Registrados ({usuariosList.length})
-          </h2>
-        </div>
-        
-        <div className="p-6">
-          {loading && usuariosList.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-bee-yellow mx-auto"></div>
-              <p className="text-gray-600 mt-2">Cargando usuarios...</p>
-            </div>
-          ) : usuariosList.length === 0 ? (
-            <div className="text-center py-8">
-              <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No hay usuarios registrados</p>
-              <p className="text-gray-500 text-sm mt-1">Crea el primer usuario para comenzar</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {usuariosList.map((usuario) => (
-                <div key={usuario.id} className="border border-gray-200 rounded-lg p-4 card-hover">
-                  <div className="flex items-start">
-                    <div className="bg-bee-yellow bg-opacity-20 p-3 rounded-lg">
-                      <Users className="h-6 w-6 text-bee-yellow" />
-                    </div>
-                    <div className="ml-4 flex-1">
-                      <h3 className="font-semibold text-gray-900">
-                        {usuario.nombre} {usuario.apellido}
-                      </h3>
-                      
-                      <div className="mt-2 space-y-1">
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Mail className="h-4 w-4 mr-2" />
-                          {usuario.email}
+      <Card title="Lista de Usuarios">
+        {usuariosList.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>👥</div>
+            <h3 style={{ marginBottom: '0.5rem', color: '#374151' }}>
+              No hay usuarios registrados
+            </h3>
+            <p>Comienza agregando tu primer usuario</p>
+            <button 
+              className="btn btn-primary mt-4"
+              onClick={() => handleOpenModal()}
+            >
+              Crear Usuario
+            </button>
+          </div>
+        ) : (
+          <div style={{ overflow: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Nombre Completo</th>
+                  <th>Rol</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usuariosList.map((usuario) => (
+                  <tr key={usuario.id}>
+                    <td>
+                      <span style={{ 
+                        fontWeight: '600', 
+                        color: '#374151' 
+                      }}>
+                        #{usuario.id}
+                      </span>
+                    </td>
+                    <td>
+                      <div>
+                        <div style={{ fontWeight: '500' }}>
+                          {usuario.nombre} {usuario.apellido}
                         </div>
-                        
-                        {usuario.telefono && (
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Phone className="h-4 w-4 mr-2" />
-                            {usuario.telefono}
-                          </div>
-                        )}
-                        
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Shield className="h-4 w-4 mr-2" />
-                          {usuario.rol_descripcion}
-                        </div>
-                        
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          {new Date(usuario.fecha_registro).toLocaleDateString('es-ES')}
+                        <div style={{ 
+                          fontSize: '0.875rem', 
+                          color: '#6b7280' 
+                        }}>
+                          Usuario ID: {usuario.id}
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
+                    </td>
+                    <td>
+                      <span className={`badge ${getRoleBadgeClass(usuario.rol)}`}>
+                        {getRoleName(usuario.rol)}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex flex-gap">
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleOpenModal(usuario)}
+                        >
+                          ✏️ Editar
+                        </button>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() => handleDelete(usuario.id, `${usuario.nombre} ${usuario.apellido}`)}
+                        >
+                          🗑️ Eliminar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* Modal para crear/editar usuario */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        title={editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
+        size="md"
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label className="form-label">Nombre *</label>
+            <input
+              type="text"
+              className="form-input"
+              value={formData.nombre}
+              onChange={(e) => setFormData({...formData, nombre: e.target.value})}
+              placeholder="Ingresa el nombre"
+            />
+            {formErrors.nombre && (
+              <div className="error-message">{formErrors.nombre}</div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Apellido *</label>
+            <input
+              type="text"
+              className="form-input"
+              value={formData.apellido}
+              onChange={(e) => setFormData({...formData, apellido: e.target.value})}
+              placeholder="Ingresa el apellido"
+            />
+            {formErrors.apellido && (
+              <div className="error-message">{formErrors.apellido}</div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              Clave {editingUser ? '(dejar vacío para mantener actual)' : '*'}
+            </label>
+            <input
+              type="password"
+              className="form-input"
+              value={formData.clave}
+              onChange={(e) => setFormData({...formData, clave: e.target.value})}
+              placeholder={editingUser ? "Nueva clave (opcional)" : "Ingresa la clave"}
+            />
+            {formErrors.clave && (
+              <div className="error-message">{formErrors.clave}</div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Rol *</label>
+            <select
+              className="form-select"
+              value={formData.rol}
+              onChange={(e) => setFormData({...formData, rol: e.target.value})}
+            >
+              <option value="">Selecciona un rol</option>
+              {rolesList.map((rol) => (
+                <option key={rol.rol} value={rol.rol}>
+                  {rol.descripcion}
+                </option>
               ))}
-            </div>
-          )}
-        </div>
-      </div>
+            </select>
+            {formErrors.rol && (
+              <div className="error-message">{formErrors.rol}</div>
+            )}
+          </div>
+
+          <div className="flex flex-gap flex-between mt-6">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleCloseModal}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading}
+            >
+              {loading ? 'Guardando...' : (editingUser ? 'Actualizar' : 'Crear')}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };
