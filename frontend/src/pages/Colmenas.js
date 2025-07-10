@@ -16,6 +16,7 @@ const Colmenas = () => {
   const [selectedColmena, setSelectedColmena] = useState(null);
   const [colmenaDetail, setColmenaDetail] = useState(null);
   const [alertMessage, setAlertMessage] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     descripcion: '',
     dueno: '',
@@ -32,16 +33,23 @@ const Colmenas = () => {
 
   const loadData = async () => {
     try {
+      console.log('🔄 Cargando datos de colmenas...');
+      
       const [colmenasData, usuariosData, nodosData] = await Promise.all([
         colmenas.getAll(),
         usuarios.getAll(),
         nodos.getAll()
       ]);
-      setColmenasList(colmenasData);
-      setUsuariosList(usuariosData);
-      setNodosList(nodosData);
+      
+      console.log('✅ Colmenas cargadas:', colmenasData);
+      console.log('✅ Usuarios cargados:', usuariosData);
+      console.log('✅ Nodos cargados:', nodosData);
+      
+      setColmenasList(colmenasData || []);
+      setUsuariosList(usuariosData || []);
+      setNodosList(nodosData || []);
     } catch (err) {
-      console.error('Error cargando datos:', err);
+      console.error('❌ Error cargando datos:', err);
       setAlertMessage({
         type: 'error',
         message: 'Error al cargar los datos de colmenas'
@@ -51,19 +59,40 @@ const Colmenas = () => {
 
   const loadColmenaDetail = async (colmenaId) => {
     try {
-      const [colmenaData, nodosData, mensajesData] = await Promise.all([
-        colmenas.getById(colmenaId),
-        colmenas.getNodos(colmenaId).catch(() => []),
-        mensajes.getByNodo ? [] : [] // Ajustar según disponibilidad
-      ]);
+      console.log(`🔍 Cargando detalle de colmena ${colmenaId}`);
+      
+      // Intentar obtener detalle completo si el método existe
+      let colmenaData;
+      try {
+        if (colmenas.getById) {
+          colmenaData = await colmenas.getById(colmenaId);
+        } else {
+          // Fallback: usar datos de la lista
+          colmenaData = colmenasList.find(c => c.id === colmenaId);
+        }
+      } catch (err) {
+        console.warn('⚠️ getById no disponible, usando datos de lista');
+        colmenaData = colmenasList.find(c => c.id === colmenaId);
+      }
+      
+      // Intentar obtener nodos asociados
+      let nodosData = [];
+      try {
+        if (colmenas.getNodos) {
+          nodosData = await colmenas.getNodos(colmenaId);
+        }
+      } catch (err) {
+        console.warn('⚠️ getNodos no disponible');
+      }
       
       setColmenaDetail({
         ...colmenaData,
         nodos: nodosData,
-        mensajesRecientes: mensajesData
+        mensajesRecientes: []
       });
+      
     } catch (err) {
-      console.error('Error cargando detalle:', err);
+      console.error('❌ Error cargando detalle:', err);
       setAlertMessage({
         type: 'error',
         message: 'Error al cargar el detalle de la colmena'
@@ -109,6 +138,7 @@ const Colmenas = () => {
       comuna: ''
     });
     setFormErrors({});
+    setIsSubmitting(false);
   };
 
   const handleOpenDetailModal = async (colmena) => {
@@ -126,7 +156,7 @@ const Colmenas = () => {
   const validateForm = () => {
     const errors = {};
     
-    if (!formData.descripcion.trim()) {
+    if (!formData.descripcion || !formData.descripcion.trim()) {
       errors.descripcion = 'La descripción es requerida';
     }
     
@@ -153,15 +183,20 @@ const Colmenas = () => {
       return;
     }
 
+    setIsSubmitting(true);
+
     try {
+      console.log('📝 Enviando datos de colmena:', formData);
+      
       const colmenaData = {
-        descripcion: formData.descripcion,
+        descripcion: formData.descripcion.trim(),
         dueno: parseInt(formData.dueno)
       };
 
       let colmenaId;
       
       if (editingColmena) {
+        console.log('✏️ Actualizando colmena:', editingColmena.id);
         await colmenas.update(editingColmena.id, colmenaData);
         colmenaId = editingColmena.id;
         setAlertMessage({
@@ -169,6 +204,7 @@ const Colmenas = () => {
           message: 'Colmena actualizada correctamente'
         });
       } else {
+        console.log('➕ Creando nueva colmena');
         const nuevaColmena = await colmenas.create(colmenaData);
         colmenaId = nuevaColmena.id;
         setAlertMessage({
@@ -177,8 +213,8 @@ const Colmenas = () => {
         });
       }
 
-      // Si hay datos de ubicación, agregarlos
-      if (formData.latitud && formData.longitud) {
+      // Intentar agregar ubicación si hay datos y el método existe
+      if (formData.latitud && formData.longitud && colmenas.addUbicacion) {
         const ubicacionData = {
           latitud: parseFloat(formData.latitud),
           longitud: parseFloat(formData.longitud),
@@ -187,34 +223,46 @@ const Colmenas = () => {
         };
         
         try {
+          console.log('📍 Agregando ubicación:', ubicacionData);
           await colmenas.addUbicacion(colmenaId, ubicacionData);
+          console.log('✅ Ubicación agregada exitosamente');
         } catch (ubicErr) {
-          console.warn('Error agregando ubicación:', ubicErr);
+          console.warn('⚠️ Error agregando ubicación (puede ser normal si el endpoint no existe):', ubicErr);
+          // No mostrar error al usuario, ya que la colmena se creó exitosamente
         }
       }
       
       handleCloseModal();
-      loadData();
+      await loadData();
     } catch (err) {
-      console.error('Error guardando colmena:', err);
+      console.error('❌ Error guardando colmena:', err);
+      
+      let errorMessage = `Error al ${editingColmena ? 'actualizar' : 'crear'} la colmena`;
+      if (err.response && err.response.data && err.response.data.error) {
+        errorMessage = err.response.data.error;
+      }
+      
       setAlertMessage({
         type: 'error',
-        message: `Error al ${editingColmena ? 'actualizar' : 'crear'} la colmena`
+        message: errorMessage
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (colmenaId, descripcion) => {
     if (window.confirm(`¿Estás seguro de que deseas eliminar la colmena "${descripcion}"?`)) {
       try {
+        console.log(`🗑️ Eliminando colmena ${colmenaId}`);
         await colmenas.delete(colmenaId);
         setAlertMessage({
           type: 'success',
           message: 'Colmena eliminada correctamente'
         });
-        loadData();
+        await loadData();
       } catch (err) {
-        console.error('Error eliminando colmena:', err);
+        console.error('❌ Error eliminando colmena:', err);
         setAlertMessage({
           type: 'error',
           message: 'Error al eliminar la colmena'
@@ -229,6 +277,7 @@ const Colmenas = () => {
   };
 
   const formatearFecha = (fecha) => {
+    if (!fecha) return 'No disponible';
     return new Date(fecha).toLocaleString('es-CL', {
       day: '2-digit',
       month: '2-digit',
@@ -249,6 +298,7 @@ const Colmenas = () => {
         <button 
           className="btn btn-primary"
           onClick={() => handleOpenModal()}
+          disabled={isSubmitting}
         >
           + Nueva Colmena
         </button>
@@ -328,7 +378,7 @@ const Colmenas = () => {
                               fontSize: '0.75rem', 
                               color: '#6b7280' 
                             }}>
-                              {colmena.latitud.toFixed(4)}, {colmena.longitud.toFixed(4)}
+                              {parseFloat(colmena.latitud).toFixed(4)}, {parseFloat(colmena.longitud).toFixed(4)}
                             </div>
                           )}
                         </div>
@@ -346,18 +396,21 @@ const Colmenas = () => {
                         <button
                           className="btn btn-secondary btn-sm"
                           onClick={() => handleOpenDetailModal(colmena)}
+                          disabled={isSubmitting}
                         >
                           👁️ Ver
                         </button>
                         <button
                           className="btn btn-secondary btn-sm"
                           onClick={() => handleOpenModal(colmena)}
+                          disabled={isSubmitting}
                         >
                           ✏️ Editar
                         </button>
                         <button
                           className="btn btn-danger btn-sm"
                           onClick={() => handleDelete(colmena.id, colmena.descripcion)}
+                          disabled={isSubmitting}
                         >
                           🗑️ Eliminar
                         </button>
@@ -383,11 +436,12 @@ const Colmenas = () => {
             <div className="form-group">
               <label className="form-label">Descripción *</label>
               <textarea
-                className="form-textarea"
+                className={`form-textarea ${formErrors.descripcion ? 'error' : ''}`}
                 value={formData.descripcion}
                 onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
                 placeholder="Describe la colmena"
                 rows="3"
+                disabled={isSubmitting}
               />
               {formErrors.descripcion && (
                 <div className="error-message">{formErrors.descripcion}</div>
@@ -397,9 +451,10 @@ const Colmenas = () => {
             <div className="form-group">
               <label className="form-label">Dueño *</label>
               <select
-                className="form-select"
+                className={`form-select ${formErrors.dueno ? 'error' : ''}`}
                 value={formData.dueno}
                 onChange={(e) => setFormData({...formData, dueno: e.target.value})}
+                disabled={isSubmitting}
               >
                 <option value="">Selecciona un dueño</option>
                 {usuariosList.map((usuario) => (
@@ -430,10 +485,11 @@ const Colmenas = () => {
               <input
                 type="number"
                 step="any"
-                className="form-input"
+                className={`form-input ${formErrors.latitud ? 'error' : ''}`}
                 value={formData.latitud}
                 onChange={(e) => setFormData({...formData, latitud: e.target.value})}
                 placeholder="-36.606111"
+                disabled={isSubmitting}
               />
               {formErrors.latitud && (
                 <div className="error-message">{formErrors.latitud}</div>
@@ -445,10 +501,11 @@ const Colmenas = () => {
               <input
                 type="number"
                 step="any"
-                className="form-input"
+                className={`form-input ${formErrors.longitud ? 'error' : ''}`}
                 value={formData.longitud}
                 onChange={(e) => setFormData({...formData, longitud: e.target.value})}
                 placeholder="-72.103611"
+                disabled={isSubmitting}
               />
               {formErrors.longitud && (
                 <div className="error-message">{formErrors.longitud}</div>
@@ -465,6 +522,7 @@ const Colmenas = () => {
                 value={formData.comuna}
                 onChange={(e) => setFormData({...formData, comuna: e.target.value})}
                 placeholder="Chillán"
+                disabled={isSubmitting}
               />
             </div>
 
@@ -476,6 +534,7 @@ const Colmenas = () => {
                 value={formData.ubicacion_descripcion}
                 onChange={(e) => setFormData({...formData, ubicacion_descripcion: e.target.value})}
                 placeholder="Ubicada en predio agrícola"
+                disabled={isSubmitting}
               />
             </div>
           </div>
@@ -485,15 +544,19 @@ const Colmenas = () => {
               type="button"
               className="btn btn-secondary"
               onClick={handleCloseModal}
+              disabled={isSubmitting}
             >
               Cancelar
             </button>
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={loading}
+              disabled={isSubmitting}
             >
-              {loading ? 'Guardando...' : (editingColmena ? 'Actualizar' : 'Crear')}
+              {isSubmitting ? 
+                (editingColmena ? 'Actualizando...' : 'Creando...') : 
+                (editingColmena ? 'Actualizar' : 'Crear')
+              }
             </button>
           </div>
         </form>
@@ -529,12 +592,12 @@ const Colmenas = () => {
                       <p style={{ margin: '0.25rem 0 0', color: '#6b7280' }}>
                         {colmenaDetail.comuna}
                         {colmenaDetail.latitud && colmenaDetail.longitud && (
-                          <br />
-                        )}
-                        {colmenaDetail.latitud && colmenaDetail.longitud && (
-                          <span style={{ fontSize: '0.875rem' }}>
-                            {colmenaDetail.latitud.toFixed(6)}, {colmenaDetail.longitud.toFixed(6)}
-                          </span>
+                          <>
+                            <br />
+                            <span style={{ fontSize: '0.875rem' }}>
+                              {parseFloat(colmenaDetail.latitud).toFixed(6)}, {parseFloat(colmenaDetail.longitud).toFixed(6)}
+                            </span>
+                          </>
                         )}
                       </p>
                     </div>

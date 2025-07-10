@@ -397,59 +397,7 @@ const Dashboard = () => {
         </div>
       </Card>
 
-      {/* Información de desarrollo */}
-      <Card title="Información de Desarrollo" className="mt-6">
-        <div style={{ 
-          padding: '1rem',
-          backgroundColor: '#f8fafc',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb'
-        }}>
-          <h4 style={{ margin: 0, marginBottom: '1rem', color: '#374151' }}>
-            Estado de Endpoints del Backend
-          </h4>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            <div>
-              <span className="badge badge-success">✅ /health</span>
-              <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
-                Funcionando correctamente
-              </p>
-            </div>
-            <div>
-              <span className="badge badge-danger">❌ /dashboard/stats</span>
-              <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
-                Pendiente implementación
-              </p>
-            </div>
-            <div>
-              <span className="badge badge-danger">❌ /colmenas</span>
-              <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
-                Error 500 - Revisar backend
-              </p>
-            </div>
-            <div>
-              <span className="badge badge-danger">❌ /usuarios</span>
-              <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
-                Error 500 - Revisar backend
-              </p>
-            </div>
-            <div>
-              <span className="badge badge-warning">⚠️ /mensajes</span>
-              <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
-                404 - Endpoint no encontrado
-              </p>
-            </div>
-          </div>
-          <p style={{ 
-            marginTop: '1rem', 
-            fontSize: '0.875rem', 
-            color: '#6b7280',
-            fontStyle: 'italic'
-          }}>
-            El frontend funciona con datos mock cuando los endpoints no están disponibles.
-          </p>
-        </div>
-      </Card>
+      
     </div>
   );
 };
