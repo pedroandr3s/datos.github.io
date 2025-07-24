@@ -18,15 +18,24 @@ const getBaseURL = () => {
     return process.env.REACT_APP_API_URL;
   }
   
-  // En desarrollo, usa localhost
+  // En desarrollo, usa backend local
   if (process.env.NODE_ENV === 'development') {
-    return 'http://localhost:3001/api';
+    return 'http://localhost:8080/api';
   }
   
-  // En producción, usa tu URL de Railway
-  return 'https://backend-production-6c78.up.railway.app/'; 
+  // ✅ Railway funcionando - URL corregida
+  return 'https://backend-production-eb26.up.railway.app/api';
 };
-
+  
+  for (const url of endpoints) {
+    try {
+      const response = await axios.get(url);
+      console.log(`✅ ${url} - FUNCIONA`, response.data);
+    } catch (error) {
+      console.log(`❌ ${url} - FALLA`, error.message);
+    }
+  }
+};
 // Configuración de axios para conectar al backend
 const api = axios.create({
   baseURL: getBaseURL(),
