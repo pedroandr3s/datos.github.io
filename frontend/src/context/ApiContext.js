@@ -27,15 +27,7 @@ const getBaseURL = () => {
   return 'https://backend-production-eb26.up.railway.app/api';
 };
   
-  for (const url of endpoints) {
-    try {
-      const response = await axios.get(url);
-      console.log(`✅ ${url} - FUNCIONA`, response.data);
-    } catch (error) {
-      console.log(`❌ ${url} - FALLA`, error.message);
-    }
-  }
-};
+
 // Configuración de axios para conectar al backend
 const api = axios.create({
   baseURL: getBaseURL(),
