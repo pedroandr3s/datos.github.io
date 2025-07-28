@@ -21,46 +21,10 @@ const Usuarios = () => {
     rol: ''
   });
   const [formErrors, setFormErrors] = useState({});
-  
-  // Estado para autenticación
-  const [currentUser, setCurrentUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Verificar autenticación al cargar el componente
-    checkAuthentication();
+    loadData();
   }, []);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadData();
-    }
-  }, [isAuthenticated]);
-
-  const checkAuthentication = () => {
-    try {
-      const token = localStorage.getItem('smartbee_token');
-      const userData = localStorage.getItem('smartbee_user');
-      
-      if (!token || !userData) {
-        console.log('❌ Usuario no autenticado, redirigiendo al login...');
-        // Redirigir al login o mostrar componente de login
-        window.location.reload();
-        return;
-      }
-
-      const user = JSON.parse(userData);
-      setCurrentUser(user);
-      setIsAuthenticated(true);
-      console.log('✅ Usuario autenticado:', user);
-      
-    } catch (error) {
-      console.error('Error verificando autenticación:', error);
-      localStorage.removeItem('smartbee_token');
-      localStorage.removeItem('smartbee_user');
-      window.location.reload();
-    }
-  };
 
   const loadData = async () => {
     try {
@@ -78,16 +42,6 @@ const Usuarios = () => {
       setRolesList(rolesData || []);
     } catch (err) {
       console.error('❌ Error cargando datos:', err);
-      
-      // Si el error es 401, probablemente el token expiró
-      if (err.response && err.response.status === 401) {
-        console.log('🔐 Token expirado, cerrando sesión...');
-        localStorage.removeItem('smartbee_token');
-        localStorage.removeItem('smartbee_user');
-        window.location.reload();
-        return;
-      }
-      
       setAlertMessage({
         type: 'error',
         message: 'Error al cargar los datos de usuarios'
@@ -111,15 +65,6 @@ const Usuarios = () => {
   };
 
   const handleOpenModal = (user = null) => {
-    // Verificar permisos antes de abrir modal
-    if (!currentUser) {
-      setAlertMessage({
-        type: 'error',
-        message: 'No tienes permisos para realizar esta acción'
-      });
-      return;
-    }
-
     if (user) {
       console.log('📝 Editando usuario:', user);
       setEditingUser(user);
@@ -245,15 +190,6 @@ const Usuarios = () => {
     } catch (err) {
       console.error('❌ Error guardando usuario:', err);
       
-      // Manejar errores de autenticación
-      if (err.response && err.response.status === 401) {
-        console.log('🔐 Token expirado durante operación...');
-        localStorage.removeItem('smartbee_token');
-        localStorage.removeItem('smartbee_user');
-        window.location.reload();
-        return;
-      }
-      
       let errorMessage = `Error al ${editingUser ? 'actualizar' : 'crear'} el usuario`;
       if (err.response && err.response.data && err.response.data.error) {
         errorMessage = err.response.data.error;
@@ -271,15 +207,6 @@ const Usuarios = () => {
   };
 
   const handleDelete = async (userId, userName) => {
-    // Verificar permisos antes de eliminar
-    if (!currentUser || currentUser.rol !== 'ADM') {
-      setAlertMessage({
-        type: 'error',
-        message: 'Solo los administradores pueden eliminar usuarios'
-      });
-      return;
-    }
-
     if (window.confirm(`¿Estás seguro de que deseas eliminar al usuario "${userName}"?`)) {
       try {
         console.log('🗑️ Eliminando usuario:', userId);
@@ -291,15 +218,6 @@ const Usuarios = () => {
         await loadData();
       } catch (err) {
         console.error('❌ Error eliminando usuario:', err);
-        
-        // Manejar errores de autenticación
-        if (err.response && err.response.status === 401) {
-          console.log('🔐 Token expirado durante eliminación...');
-          localStorage.removeItem('smartbee_token');
-          localStorage.removeItem('smartbee_user');
-          window.location.reload();
-          return;
-        }
         
         let errorMessage = 'Error al eliminar el usuario';
         if (err.response && err.response.data && err.response.data.error) {
@@ -357,32 +275,14 @@ const Usuarios = () => {
     }
   };
 
-  // Si no está autenticado, mostrar mensaje de carga
-  if (!isAuthenticated) {
-    return <Loading message="Verificando autenticación..." />;
-  }
-
   if (loading && usuariosList.length === 0) {
     return <Loading message="Cargando usuarios..." />;
   }
 
   return (
     <div>
-      {/* Header con información del usuario actual */}
       <div className="flex flex-between flex-center mb-6">
-        <div>
-          <h1 className="page-title" style={{ margin: 0 }}>Usuarios</h1>
-          {currentUser && (
-            <p style={{ 
-              fontSize: '0.875rem', 
-              color: '#6b7280', 
-              margin: '4px 0 0 0' 
-            }}>
-              Sesión activa: <strong>{currentUser.nombre} {currentUser.apellido}</strong> 
-              ({currentUser.rol_nombre || currentUser.rol})
-            </p>
-          )}
-        </div>
+        <h1 className="page-title" style={{ margin: 0 }}>Usuarios</h1>
         <button 
           className="btn btn-primary"
           onClick={() => handleOpenModal()}
@@ -483,16 +383,13 @@ const Usuarios = () => {
                           >
                             ✏️ Editar
                           </button>
-                          {/* Solo mostrar botón eliminar si es administrador */}
-                          {currentUser && currentUser.rol === 'ADM' && (
-                            <button
-                              className="btn btn-danger btn-sm"
-                              onClick={() => handleDelete(usuario.id, `${usuario.nombre} ${usuario.apellido}`)}
-                              disabled={isSubmitting}
-                            >
-                              🗑️ Eliminar
-                            </button>
-                          )}
+                          <button
+                            className="btn btn-danger btn-sm"
+                            onClick={() => handleDelete(usuario.id, `${usuario.nombre} ${usuario.apellido}`)}
+                            disabled={isSubmitting}
+                          >
+                            🗑️ Eliminar
+                          </button>
                         </div>
                       </td>
                     </tr>
