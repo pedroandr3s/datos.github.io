@@ -331,7 +331,7 @@ const Login = ({ onLoginSuccess }) => {
 
             <div className="login-footer">
               <p className="login-footer-text">
-                SmartBee © 2025 - Sistema de Gestión de Colmenas
+                Nombre:Pedro Contraseña:admin123
               </p>
             </div>
           </div>
