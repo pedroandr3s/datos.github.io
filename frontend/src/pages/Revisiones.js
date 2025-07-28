@@ -278,7 +278,8 @@ const getPriorityLevel = (priority) => {
 };
 
 const Revisiones = () => {
-  const { nodoMensajes, nodos, colmenas, nodoTipos, loading, error } = useApi();
+  // Corregir la referencia a la API - usar 'mensajes' en lugar de 'nodoMensajes'
+  const { mensajes, nodos, colmenas, nodoTipos, loading, error } = useApi();
   
   // Estados principales
   const [mensajesList, setMensajesList] = useState([]);
@@ -291,6 +292,7 @@ const Revisiones = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+  const [isTestDataModalOpen, setIsTestDataModalOpen] = useState(false);
   
   // Estados de datos seleccionados
   const [selectedMensaje, setSelectedMensaje] = useState(null);
@@ -313,6 +315,14 @@ const Revisiones = () => {
     payload: ''
   });
   const [formErrors, setFormErrors] = useState({});
+
+  // Estados para el formulario de datos de prueba
+  const [testFormData, setTestFormData] = useState({
+    nodo_id: '',
+    temperatura: '',
+    humedad: ''
+  });
+  const [testFormErrors, setTestFormErrors] = useState({});
 
   // Estados para filtros
   const [filters, setFilters] = useState({
@@ -339,10 +349,21 @@ const Revisiones = () => {
   const [chartTimeScale, setChartTimeScale] = useState('minuto');
   const [realTimeData, setRealTimeData] = useState(new Map());
 
+  // Estados para autenticación
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
   // Effects
   useEffect(() => {
-    loadData();
+    // Verificar autenticación al cargar el componente
+    checkAuthentication();
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadData();
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     applyFilters();
@@ -353,6 +374,30 @@ const Revisiones = () => {
   useEffect(() => {
     updateChartData();
   }, [realTimeData, chartTimeScale]);
+
+  const checkAuthentication = () => {
+    try {
+      const token = localStorage.getItem('smartbee_token');
+      const userData = localStorage.getItem('smartbee_user');
+      
+      if (!token || !userData) {
+        console.log('❌ Usuario no autenticado, redirigiendo al login...');
+        window.location.reload();
+        return;
+      }
+
+      const user = JSON.parse(userData);
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      console.log('✅ Usuario autenticado:', user);
+      
+    } catch (error) {
+      console.error('Error verificando autenticación:', error);
+      localStorage.removeItem('smartbee_token');
+      localStorage.removeItem('smartbee_user');
+      window.location.reload();
+    }
+  };
 
   // Función para analizar alertas en los mensajes
   const analyzeAlerts = () => {
@@ -396,7 +441,7 @@ const Revisiones = () => {
     try {
       console.log('🔄 Cargando datos iniciales...');
       const [mensajesData, nodosData, colmenasData, tiposData] = await Promise.all([
-        nodoMensajes.getRecientes ? nodoMensajes.getRecientes(24) : nodoMensajes.getAll(),
+        mensajes.getRecientes ? mensajes.getRecientes(24) : mensajes.getAll(),
         nodos.getAll(),
         colmenas.getAll(),
         nodoTipos.getAll()
@@ -410,6 +455,16 @@ const Revisiones = () => {
       initializeRealTimeData(mensajesData || []);
     } catch (err) {
       console.error('Error cargando datos:', err);
+      
+      // Si el error es 401, probablemente el token expiró
+      if (err.response && err.response.status === 401) {
+        console.log('🔐 Token expirado, cerrando sesión...');
+        localStorage.removeItem('smartbee_token');
+        localStorage.removeItem('smartbee_user');
+        window.location.reload();
+        return;
+      }
+      
       setAlertMessage({
         type: 'error',
         message: 'Error al cargar los datos de revisiones'
@@ -457,6 +512,15 @@ const Revisiones = () => {
   };
 
   const generateSampleData = async () => {
+    // Verificar permisos antes de generar datos
+    if (!currentUser || (currentUser.rol !== 'ADM' && currentUser.rol !== 'API')) {
+      setAlertMessage({
+        type: 'error',
+        message: 'Solo administradores y apicultores pueden generar datos de muestra'
+      });
+      return;
+    }
+
     if (isGeneratingData) {
       console.log('⚠️ Ya se está generando datos, esperando...');
       return;
@@ -479,6 +543,16 @@ const Revisiones = () => {
       });
     } catch (error) {
       console.error('❌ Error generando datos:', error);
+      
+      // Manejar errores de autenticación
+      if (error.response && error.response.status === 401) {
+        console.log('🔐 Token expirado durante generación...');
+        localStorage.removeItem('smartbee_token');
+        localStorage.removeItem('smartbee_user');
+        window.location.reload();
+        return;
+      }
+      
       setAlertMessage({
         type: 'error',
         message: 'Error al generar datos de muestra'
@@ -505,7 +579,7 @@ const Revisiones = () => {
 
     const promises = sampleData.map(async (data) => {
       try {
-        await nodoMensajes.create(data);
+        await mensajes.create(data);
         const analysis = analyzeMessage(data.topico, data.payload);
         console.log(`✅ Dato creado: Nodo ${data.nodo_id}, ${data.topico}: ${data.payload} - ${analysis.category.toUpperCase()}`);
         return data;
@@ -570,7 +644,7 @@ const Revisiones = () => {
           payload: newPayload
         };
 
-        await nodoMensajes.create(nuevoMensaje);
+        await mensajes.create(nuevoMensaje);
         return { key, value: newValue, timestamp: new Date(), payload: newPayload, analysis };
       });
 
@@ -614,9 +688,9 @@ const Revisiones = () => {
 
       // Recargar mensajes
       console.log('🔄 Recargando lista de mensajes...');
-      const mensajesActualizados = await nodoMensajes.getRecientes ? 
-        nodoMensajes.getRecientes(24) : 
-        nodoMensajes.getAll();
+      const mensajesActualizados = await mensajes.getRecientes ? 
+        mensajes.getRecientes(24) : 
+        mensajes.getAll();
       setMensajesList(mensajesActualizados || []);
 
     } catch (error) {
@@ -733,8 +807,17 @@ const Revisiones = () => {
     setEstadisticas(stats);
   };
 
-  // CRUD Functions actualizadas para el nuevo esquema
+  // CRUD Functions actualizadas para el nuevo esquema y autenticación
   const handleCreateMensaje = () => {
+    // Verificar permisos antes de abrir modal
+    if (!currentUser) {
+      setAlertMessage({
+        type: 'error',
+        message: 'No tienes permisos para realizar esta acción'
+      });
+      return;
+    }
+
     setFormData({
       nodo_id: '',
       topico: '',
@@ -742,6 +825,35 @@ const Revisiones = () => {
     });
     setFormErrors({});
     setIsCreateModalOpen(true);
+  };
+
+  const handleOpenTestDataModal = () => {
+    // Verificar permisos antes de abrir modal
+    if (!currentUser) {
+      setAlertMessage({
+        type: 'error',
+        message: 'No tienes permisos para realizar esta acción'
+      });
+      return;
+    }
+
+    setTestFormData({
+      nodo_id: '',
+      temperatura: '',
+      humedad: ''
+    });
+    setTestFormErrors({});
+    setIsTestDataModalOpen(true);
+  };
+
+  const handleCloseTestDataModal = () => {
+    setIsTestDataModalOpen(false);
+    setTestFormData({
+      nodo_id: '',
+      temperatura: '',
+      humedad: ''
+    });
+    setTestFormErrors({});
   };
 
   const validateForm = () => {
@@ -765,6 +877,39 @@ const Revisiones = () => {
     return Object.keys(errors).length === 0;
   };
 
+  const validateTestForm = () => {
+    const errors = {};
+    
+    if (!testFormData.nodo_id) {
+      errors.nodo_id = 'El nodo es requerido';
+    }
+    
+    if (!testFormData.temperatura || testFormData.temperatura === '') {
+      errors.temperatura = 'La temperatura es requerida';
+    } else {
+      const temp = parseFloat(testFormData.temperatura);
+      if (isNaN(temp)) {
+        errors.temperatura = 'Debe ser un número válido';
+      } else if (temp < -50 || temp > 100) {
+        errors.temperatura = 'Debe estar entre -50°C y 100°C';
+      }
+    }
+    
+    if (!testFormData.humedad || testFormData.humedad === '') {
+      errors.humedad = 'La humedad es requerida';
+    } else {
+      const hum = parseFloat(testFormData.humedad);
+      if (isNaN(hum)) {
+        errors.humedad = 'Debe ser un número válido';
+      } else if (hum < 0 || hum > 100) {
+        errors.humedad = 'Debe estar entre 0% y 100%';
+      }
+    }
+
+    setTestFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmitMensaje = async (e) => {
     e.preventDefault();
     
@@ -783,7 +928,7 @@ const Revisiones = () => {
 
       const analysis = analyzeMessage(dataToSend.topico, dataToSend.payload);
       
-      await nodoMensajes.create(dataToSend);
+      await mensajes.create(dataToSend);
       
       let messageType = 'success';
       let message = 'Mensaje creado correctamente';
@@ -805,6 +950,16 @@ const Revisiones = () => {
       await loadData();
     } catch (err) {
       console.error('Error guardando mensaje:', err);
+      
+      // Manejar errores de autenticación
+      if (err.response && err.response.status === 401) {
+        console.log('🔐 Token expirado durante creación...');
+        localStorage.removeItem('smartbee_token');
+        localStorage.removeItem('smartbee_user');
+        window.location.reload();
+        return;
+      }
+      
       setAlertMessage({
         type: 'error',
         message: 'Error al crear el mensaje'
@@ -814,10 +969,112 @@ const Revisiones = () => {
     }
   };
 
+  const handleSubmitTestData = async (e) => {
+    e.preventDefault();
+    
+    if (!validateTestForm()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const temperatura = parseFloat(testFormData.temperatura);
+      const humedad = parseFloat(testFormData.humedad);
+      
+      // Crear mensajes para temperatura y humedad
+      const mensajes = [
+        {
+          nodo_id: testFormData.nodo_id,
+          topico: 'temperatura',
+          payload: `${temperatura}°C`
+        },
+        {
+          nodo_id: testFormData.nodo_id,
+          topico: 'humedad',
+          payload: `${humedad}%`
+        }
+      ];
+
+      // Analizar alertas antes de enviar
+      const analisisTemp = analyzeMessage('temperatura', `${temperatura}°C`);
+      const analisisHum = analyzeMessage('humedad', `${humedad}%`);
+      
+      console.log(`🧪 TEST - Temperatura: ${temperatura}°C -> ${analisisTemp.category.toUpperCase()}`);
+      console.log(`🧪 TEST - Humedad: ${humedad}% -> ${analisisHum.category.toUpperCase()}`);
+
+      // Enviar ambos mensajes
+      const promises = mensajes.map(mensaje => mensajes.create(mensaje));
+      await Promise.all(promises);
+      
+      // Determinar tipo de alerta para el mensaje
+      let messageType = 'success';
+      let message = '✅ Datos de temperatura y humedad enviados correctamente';
+      
+      const alertasCriticas = [];
+      const alertasPreventivas = [];
+      
+      if (analisisTemp.category === 'critical') {
+        alertasCriticas.push(`🌡️ ${analisisTemp.message}`);
+      } else if (analisisTemp.category === 'warning') {
+        alertasPreventivas.push(`🌡️ ${analisisTemp.message}`);
+      }
+      
+      if (analisisHum.category === 'critical') {
+        alertasCriticas.push(`💧 ${analisisHum.message}`);
+      } else if (analisisHum.category === 'warning') {
+        alertasPreventivas.push(`💧 ${analisisHum.message}`);
+      }
+      
+      if (alertasCriticas.length > 0) {
+        messageType = 'error';
+        message = `🚨 ALERTAS CRÍTICAS GENERADAS:\n${alertasCriticas.join('\n')}`;
+      } else if (alertasPreventivas.length > 0) {
+        messageType = 'warning';
+        message = `⚠️ ALERTAS PREVENTIVAS:\n${alertasPreventivas.join('\n')}`;
+      }
+      
+      setAlertMessage({
+        type: messageType,
+        message: message
+      });
+      
+      handleCloseTestDataModal();
+      await loadData();
+    } catch (err) {
+      console.error('Error enviando datos de prueba:', err);
+      
+      // Manejar errores de autenticación
+      if (err.response && err.response.status === 401) {
+        console.log('🔐 Token expirado durante envío...');
+        localStorage.removeItem('smartbee_token');
+        localStorage.removeItem('smartbee_user');
+        window.location.reload();
+        return;
+      }
+      
+      setAlertMessage({
+        type: 'error',
+        message: 'Error al enviar los datos de prueba'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleDeleteMensaje = async (mensajeId, topico) => {
+    // Verificar permisos antes de eliminar
+    if (!currentUser || currentUser.rol !== 'ADM') {
+      setAlertMessage({
+        type: 'error',
+        message: 'Solo los administradores pueden eliminar mensajes'
+      });
+      return;
+    }
+
     if (window.confirm(`¿Estás seguro de que deseas eliminar el mensaje "${topico}"?`)) {
       try {
-        await nodoMensajes.delete(mensajeId);
+        await mensajes.delete(mensajeId);
         setAlertMessage({
           type: 'success',
           message: 'Mensaje eliminado correctamente'
@@ -825,6 +1082,16 @@ const Revisiones = () => {
         await loadData();
       } catch (err) {
         console.error('Error eliminando mensaje:', err);
+        
+        // Manejar errores de autenticación
+        if (err.response && err.response.status === 401) {
+          console.log('🔐 Token expirado durante eliminación...');
+          localStorage.removeItem('smartbee_token');
+          localStorage.removeItem('smartbee_user');
+          window.location.reload();
+          return;
+        }
+        
         setAlertMessage({
           type: 'error',
           message: 'Error al eliminar el mensaje'
@@ -967,6 +1234,19 @@ const Revisiones = () => {
     }
   };
 
+  // Verificar permisos para diferentes acciones
+  const canCreateMessages = () => {
+    return currentUser && (currentUser.rol === 'ADM' || currentUser.rol === 'API');
+  };
+
+  const canDeleteMessages = () => {
+    return currentUser && currentUser.rol === 'ADM';
+  };
+
+  const canGenerateData = () => {
+    return currentUser && (currentUser.rol === 'ADM' || currentUser.rol === 'API');
+  };
+
   // Función para renderizar el gráfico
   const renderChart = () => {
     if (chartData.length === 0 || realTimeData.size === 0) {
@@ -984,14 +1264,16 @@ const Revisiones = () => {
             <p style={{ fontSize: '0.875rem' }}>
               Puntos de datos: {chartData.length} | Datos en tiempo real: {realTimeData.size}
             </p>
-            <button 
-              className="btn btn-primary btn-sm"
-              onClick={generateSampleData}
-              disabled={isGeneratingData}
-              style={{ marginTop: '1rem' }}
-            >
-              {isGeneratingData ? 'Generando...' : '🎲 Generar Datos de Muestra'}
-            </button>
+            {canGenerateData() && (
+              <button 
+                className="btn btn-primary btn-sm"
+                onClick={generateSampleData}
+                disabled={isGeneratingData}
+                style={{ marginTop: '1rem' }}
+              >
+                {isGeneratingData ? 'Generando...' : '🎲 Generar Datos de Muestra'}
+              </button>
+            )}
           </div>
         </div>
       );
@@ -1152,6 +1434,11 @@ const Revisiones = () => {
     );
   };
 
+  // Si no está autenticado, mostrar mensaje de carga
+  if (!isAuthenticated) {
+    return <Loading message="Verificando autenticación..." />;
+  }
+
   if (loading) return <Loading message="Cargando revisiones..." />;
 
   return (
@@ -1163,6 +1450,16 @@ const Revisiones = () => {
           <p className="page-subtitle">
             Monitoreo en tiempo real con detección automática de alertas críticas
           </p>
+          {currentUser && (
+            <p style={{ 
+              fontSize: '0.875rem', 
+              color: '#6b7280', 
+              margin: '4px 0 0 0' 
+            }}>
+              Sesión activa: <strong>{currentUser.nombre} {currentUser.apellido}</strong> 
+              ({currentUser.rol_nombre || currentUser.rol})
+            </p>
+          )}
         </div>
         <div className="header-right">
           <div className="header-controls">
@@ -1199,19 +1496,42 @@ const Revisiones = () => {
             >
               🔍 Filtros
             </button>
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={handleCreateMensaje}
-            >
-              ➕ Nuevo Mensaje
-            </button>
-            <button
-              className="btn btn-warning btn-sm"
-              onClick={generateSampleData}
-              disabled={isGeneratingData}
-            >
-              {isGeneratingData ? '⏳' : '🎲'} Simular Datos
-            </button>
+            
+            {/* Solo mostrar botón crear mensaje si tiene permisos */}
+            {canCreateMessages() && (
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleCreateMensaje}
+              >
+                ➕ Nuevo Mensaje
+              </button>
+            )}
+            
+            {/* Botón para probar rangos de temperatura y humedad */}
+            {canCreateMessages() && (
+              <button
+                className="btn btn-success btn-sm"
+                onClick={handleOpenTestDataModal}
+                style={{ 
+                  background: 'linear-gradient(45deg, #10b981, #059669)',
+                  border: 'none',
+                  boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
+                }}
+              >
+                🧪 Probar Rangos T°/H%
+              </button>
+            )}
+            
+            {/* Solo mostrar botón simular datos si tiene permisos */}
+            {canGenerateData() && (
+              <button
+                className="btn btn-warning btn-sm"
+                onClick={generateSampleData}
+                disabled={isGeneratingData}
+              >
+                {isGeneratingData ? '⏳' : '🎲'} Simular Datos
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1418,6 +1738,7 @@ const Revisiones = () => {
           </div>
         )}
       </Card>
+      
       {/* Lista de mensajes */}
       <Card 
         title={`💬 Mensajes Recientes (${filteredMensajes.length})`}
@@ -1536,15 +1857,19 @@ const Revisiones = () => {
                           🚨 Alerta
                         </button>
                       )}
-                      <button
-                        className="btn btn-sm btn-danger"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteMensaje(mensaje.id, mensaje.topico);
-                        }}
-                      >
-                        🗑️
-                      </button>
+                      {/* Solo mostrar eliminar si es administrador */}
+                      {canDeleteMessages() && (
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteMensaje(mensaje.id, mensaje.topico);
+                          }}
+                          title="Eliminar mensaje (solo administradores)"
+                        >
+                          🗑️
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1791,6 +2116,226 @@ const Revisiones = () => {
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Creando...' : 'Crear Mensaje'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal para Probar Rangos de Temperatura y Humedad */}
+      <Modal
+        isOpen={isTestDataModalOpen}
+        onClose={handleCloseTestDataModal}
+        title="🧪 Probar Rangos de Temperatura y Humedad"
+        size="md"
+      >
+        <div style={{ 
+          backgroundColor: '#f0fdf4', 
+          border: '1px solid #bbf7d0', 
+          borderRadius: '0.5rem', 
+          padding: '1rem',
+          marginBottom: '1.5rem'
+        }}>
+          <h4 style={{ 
+            margin: '0 0 0.5rem', 
+            color: '#059669',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            📊 Rangos del Sistema de Alertas
+          </h4>
+          
+          <div style={{ fontSize: '0.875rem', color: '#047857' }}>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <strong>🌡️ Temperatura:</strong>
+              <div style={{ marginLeft: '1rem', marginTop: '0.25rem' }}>
+                • <span style={{ color: '#dc2626', fontWeight: 'bold' }}>Crítico:</span> &lt; 5°C o &gt; 45°C<br/>
+                • <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>Advertencia:</span> 5-10°C o 35-45°C<br/>
+                • <span style={{ color: '#10b981', fontWeight: 'bold' }}>Normal:</span> 10-35°C
+              </div>
+            </div>
+            
+            <div>
+              <strong>💧 Humedad:</strong>
+              <div style={{ marginLeft: '1rem', marginTop: '0.25rem' }}>
+                • <span style={{ color: '#dc2626', fontWeight: 'bold' }}>Crítico:</span> &lt; 20% o &gt; 90%<br/>
+                • <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>Advertencia:</span> 20-30% o 80-90%<br/>
+                • <span style={{ color: '#10b981', fontWeight: 'bold' }}>Normal:</span> 30-80%
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmitTestData}>
+          <div className="form-group">
+            <label className="form-label">Nodo *</label>
+            <select
+              className={`form-select ${testFormErrors.nodo_id ? 'error' : ''}`}
+              value={testFormData.nodo_id}
+              onChange={(e) => setTestFormData({...testFormData, nodo_id: e.target.value})}
+              disabled={isSubmitting}
+            >
+              <option value="">Selecciona un nodo</option>
+              {nodosList.map((nodo) => (
+                <option key={nodo.id} value={nodo.id}>
+                  Nodo {nodo.id} - {nodo.descripcion}
+                </option>
+              ))}
+            </select>
+            {testFormErrors.nodo_id && (
+              <div className="error-message">{testFormErrors.nodo_id}</div>
+            )}
+          </div>
+
+          <div className="grid grid-2">
+            <div className="form-group">
+              <label className="form-label">🌡️ Temperatura (°C) *</label>
+              <input
+                type="number"
+                step="0.1"
+                className={`form-input ${testFormErrors.temperatura ? 'error' : ''}`}
+                value={testFormData.temperatura}
+                onChange={(e) => setTestFormData({...testFormData, temperatura: e.target.value})}
+                placeholder="Ej: -2, 25.5, 50"
+                disabled={isSubmitting}
+                min="-50"
+                max="100"
+              />
+              {testFormErrors.temperatura && (
+                <div className="error-message">{testFormErrors.temperatura}</div>
+              )}
+              
+              {/* Preview de alerta para temperatura */}
+              {testFormData.temperatura && !isNaN(parseFloat(testFormData.temperatura)) && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  {(() => {
+                    const analysis = analyzeMessage('temperatura', `${parseFloat(testFormData.temperatura)}°C`);
+                    return (
+                      <div style={{
+                        padding: '0.5rem',
+                        borderRadius: '0.25rem',
+                        fontSize: '0.75rem',
+                        backgroundColor: analysis.category === 'critical' ? '#fef2f2' :
+                                        analysis.category === 'warning' ? '#fffbeb' : '#f0fdf4',
+                        border: `1px solid ${analysis.color}`,
+                        color: analysis.color,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem'
+                      }}>
+                        <span>{analysis.icon}</span>
+                        <strong>{analysis.category.toUpperCase()}:</strong>
+                        <span>{analysis.message}</span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">💧 Humedad (%) *</label>
+              <input
+                type="number"
+                step="0.1"
+                className={`form-input ${testFormErrors.humedad ? 'error' : ''}`}
+                value={testFormData.humedad}
+                onChange={(e) => setTestFormData({...testFormData, humedad: e.target.value})}
+                placeholder="Ej: 15, 55.5, 95"
+                disabled={isSubmitting}
+                min="0"
+                max="100"
+              />
+              {testFormErrors.humedad && (
+                <div className="error-message">{testFormErrors.humedad}</div>
+              )}
+              
+              {/* Preview de alerta para humedad */}
+              {testFormData.humedad && !isNaN(parseFloat(testFormData.humedad)) && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  {(() => {
+                    const analysis = analyzeMessage('humedad', `${parseFloat(testFormData.humedad)}%`);
+                    return (
+                      <div style={{
+                        padding: '0.5rem',
+                        borderRadius: '0.25rem',
+                        fontSize: '0.75rem',
+                        backgroundColor: analysis.category === 'critical' ? '#fef2f2' :
+                                        analysis.category === 'warning' ? '#fffbeb' : '#f0fdf4',
+                        border: `1px solid ${analysis.color}`,
+                        color: analysis.color,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem'
+                      }}>
+                        <span>{analysis.icon}</span>
+                        <strong>{analysis.category.toUpperCase()}:</strong>
+                        <span>{analysis.message}</span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Valores de ejemplo sugeridos */}
+          <div style={{ 
+            backgroundColor: '#fffbeb', 
+            border: '1px solid #fed7aa', 
+            borderRadius: '0.5rem', 
+            padding: '1rem',
+            marginTop: '1rem'
+          }}>
+            <h5 style={{ 
+              margin: '0 0 0.75rem', 
+              color: '#92400e',
+              fontSize: '0.875rem',
+              fontWeight: '600'
+            }}>
+              💡 Valores de Prueba Sugeridos:
+            </h5>
+            
+            <div style={{ fontSize: '0.75rem', color: '#92400e', lineHeight: '1.5' }}>
+              <div style={{ marginBottom: '0.5rem' }}>
+                <strong>Para generar alertas críticas:</strong><br/>
+                • Temperatura: -5°C, 2°C, 50°C, 60°C<br/>
+                • Humedad: 5%, 15%, 95%, 98%
+              </div>
+              
+              <div style={{ marginBottom: '0.5rem' }}>
+                <strong>Para generar alertas preventivas:</strong><br/>
+                • Temperatura: 8°C, 38°C, 42°C<br/>
+                • Humedad: 25%, 85%, 88%
+              </div>
+              
+              <div>
+                <strong>Para valores normales:</strong><br/>
+                • Temperatura: 15°C, 22°C, 28°C<br/>
+                • Humedad: 40%, 55%, 70%
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-gap flex-between mt-6">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleCloseTestDataModal}
+              disabled={isSubmitting}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="btn btn-success"
+              disabled={isSubmitting}
+              style={{ 
+                background: 'linear-gradient(45deg, #10b981, #059669)',
+                border: 'none'
+              }}
+            >
+              {isSubmitting ? '🧪 Enviando...' : '🧪 Probar Rangos'}
             </button>
           </div>
         </form>

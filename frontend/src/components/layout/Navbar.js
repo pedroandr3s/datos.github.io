@@ -1,11 +1,43 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApi } from '../../context/ApiContext';
 
 const Navbar = () => {
   const { isConnected, testConnection, loading } = useApi();
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    // Cargar datos del usuario al inicializar el componente
+    loadUserData();
+  }, []);
+
+  const loadUserData = () => {
+    try {
+      const userData = localStorage.getItem('smartbee_user');
+      if (userData) {
+        const user = JSON.parse(userData);
+        setCurrentUser(user);
+        console.log('✅ Datos del usuario cargados en Navbar:', user);
+      }
+    } catch (error) {
+      console.error('Error cargando datos del usuario:', error);
+    }
+  };
 
   const handleRefresh = () => {
     testConnection();
+  };
+
+  const handleLogout = () => {
+    if (window.confirm('¿Estás seguro de que deseas cerrar sesión?')) {
+      console.log('👋 Cerrando sesión...');
+      
+      // Limpiar localStorage
+      localStorage.removeItem('smartbee_token');
+      localStorage.removeItem('smartbee_user');
+      
+      // Recargar la página para volver al login
+      window.location.reload();
+    }
   };
 
   const getCurrentTime = () => {
@@ -17,6 +49,38 @@ const Navbar = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const getUserInitials = () => {
+    if (!currentUser) return 'U';
+    const nombre = currentUser.nombre || '';
+    const apellido = currentUser.apellido || '';
+    return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
+  };
+
+  const getUserName = () => {
+    if (!currentUser) return 'Usuario';
+    return `${currentUser.nombre || ''} ${currentUser.apellido || ''}`.trim();
+  };
+
+  const getUserRole = () => {
+    if (!currentUser) return 'Sin rol';
+    return currentUser.rol_nombre || currentUser.rol || 'Sin rol';
+  };
+
+  const getRoleColor = () => {
+    if (!currentUser) return '#6b7280';
+    
+    switch (currentUser.rol) {
+      case 'ADM':
+        return '#dc2626'; // Rojo para administrador
+      case 'API':
+        return '#059669'; // Verde para apicultor
+      case 'INV':
+        return '#2563eb'; // Azul para investigador
+      default:
+        return '#6b7280'; // Gris por defecto
+    }
   };
 
   return (
@@ -114,13 +178,15 @@ const Navbar = () => {
             marginLeft: '1rem',
             padding: '0.5rem',
             borderRadius: '0.5rem',
-            backgroundColor: '#f9fafb'
+            backgroundColor: '#f9fafb',
+            border: '1px solid #e5e7eb'
           }}>
+            {/* Avatar con iniciales del usuario */}
             <div style={{ 
               width: '32px', 
               height: '32px', 
               borderRadius: '50%', 
-              backgroundColor: '#3b82f6',
+              backgroundColor: getRoleColor(),
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -128,48 +194,81 @@ const Navbar = () => {
               fontSize: '0.875rem',
               fontWeight: '600'
             }}>
-              PV
+              {getUserInitials()}
             </div>
+            
+            {/* Información del usuario */}
             <div>
               <div style={{ 
                 fontSize: '0.875rem', 
                 fontWeight: '500', 
                 color: '#1f2937' 
               }}>
-                Pedro Vera
+                {getUserName()}
               </div>
               <div style={{ 
                 fontSize: '0.75rem', 
-                color: '#6b7280' 
+                color: getRoleColor(),
+                fontWeight: '500'
               }}>
-                Administrador
+                {getUserRole()}
               </div>
             </div>
             
             {/* Logout Button */}
             <button
+              onClick={handleLogout}
               style={{
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                padding: '0.25rem',
-                borderRadius: '0.25rem',
+                padding: '0.5rem',
+                borderRadius: '0.375rem',
                 color: '#6b7280',
-                fontSize: '1rem'
+                fontSize: '1.125rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease'
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#e5e7eb';
-                e.target.style.color = '#374151';
+                e.target.style.backgroundColor = '#fee2e2';
+                e.target.style.color = '#dc2626';
+                e.target.style.transform = 'scale(1.05)';
               }}
               onMouseLeave={(e) => {
                 e.target.style.backgroundColor = 'transparent';
                 e.target.style.color = '#6b7280';
+                e.target.style.transform = 'scale(1)';
               }}
               title="Cerrar Sesión"
             >
               🚪
             </button>
           </div>
+
+          {/* Indicador de sesión activa */}
+          {currentUser && (
+            <div style={{
+              fontSize: '0.75rem',
+              color: '#059669',
+              backgroundColor: '#ecfdf5',
+              padding: '0.25rem 0.5rem',
+              borderRadius: '0.25rem',
+              border: '1px solid #d1fae5',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem'
+            }}>
+              <div style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                backgroundColor: '#10b981'
+              }} />
+              Sesión Activa
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -26,10 +26,45 @@ const Colmenas = () => {
     comuna: ''
   });
   const [formErrors, setFormErrors] = useState({});
+  
+  // Estado para autenticación
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    loadData();
+    // Verificar autenticación al cargar el componente
+    checkAuthentication();
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadData();
+    }
+  }, [isAuthenticated]);
+
+  const checkAuthentication = () => {
+    try {
+      const token = localStorage.getItem('smartbee_token');
+      const userData = localStorage.getItem('smartbee_user');
+      
+      if (!token || !userData) {
+        console.log('❌ Usuario no autenticado, redirigiendo al login...');
+        window.location.reload();
+        return;
+      }
+
+      const user = JSON.parse(userData);
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      console.log('✅ Usuario autenticado:', user);
+      
+    } catch (error) {
+      console.error('Error verificando autenticación:', error);
+      localStorage.removeItem('smartbee_token');
+      localStorage.removeItem('smartbee_user');
+      window.location.reload();
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -50,6 +85,16 @@ const Colmenas = () => {
       setNodosList(nodosData || []);
     } catch (err) {
       console.error('❌ Error cargando datos:', err);
+      
+      // Si el error es 401, probablemente el token expiró
+      if (err.response && err.response.status === 401) {
+        console.log('🔐 Token expirado, cerrando sesión...');
+        localStorage.removeItem('smartbee_token');
+        localStorage.removeItem('smartbee_user');
+        window.location.reload();
+        return;
+      }
+      
       setAlertMessage({
         type: 'error',
         message: 'Error al cargar los datos de colmenas'
@@ -93,6 +138,16 @@ const Colmenas = () => {
       
     } catch (err) {
       console.error('❌ Error cargando detalle:', err);
+      
+      // Manejar errores de autenticación
+      if (err.response && err.response.status === 401) {
+        console.log('🔐 Token expirado durante carga de detalle...');
+        localStorage.removeItem('smartbee_token');
+        localStorage.removeItem('smartbee_user');
+        window.location.reload();
+        return;
+      }
+      
       setAlertMessage({
         type: 'error',
         message: 'Error al cargar el detalle de la colmena'
@@ -101,6 +156,15 @@ const Colmenas = () => {
   };
 
   const handleOpenModal = (colmena = null) => {
+    // Verificar permisos antes de abrir modal
+    if (!currentUser) {
+      setAlertMessage({
+        type: 'error',
+        message: 'No tienes permisos para realizar esta acción'
+      });
+      return;
+    }
+
     if (colmena) {
       setEditingColmena(colmena);
       setFormData({
@@ -190,7 +254,7 @@ const Colmenas = () => {
       
       const colmenaData = {
         descripcion: formData.descripcion.trim(),
-        dueno: parseInt(formData.dueno)
+        dueno: formData.dueno
       };
 
       let colmenaId;
@@ -237,6 +301,15 @@ const Colmenas = () => {
     } catch (err) {
       console.error('❌ Error guardando colmena:', err);
       
+      // Manejar errores de autenticación
+      if (err.response && err.response.status === 401) {
+        console.log('🔐 Token expirado durante operación...');
+        localStorage.removeItem('smartbee_token');
+        localStorage.removeItem('smartbee_user');
+        window.location.reload();
+        return;
+      }
+      
       let errorMessage = `Error al ${editingColmena ? 'actualizar' : 'crear'} la colmena`;
       if (err.response && err.response.data && err.response.data.error) {
         errorMessage = err.response.data.error;
@@ -252,6 +325,15 @@ const Colmenas = () => {
   };
 
   const handleDelete = async (colmenaId, descripcion) => {
+    // Verificar permisos antes de eliminar
+    if (!currentUser || currentUser.rol !== 'ADM') {
+      setAlertMessage({
+        type: 'error',
+        message: 'Solo los administradores pueden eliminar colmenas'
+      });
+      return;
+    }
+
     if (window.confirm(`¿Estás seguro de que deseas eliminar la colmena "${descripcion}"?`)) {
       try {
         console.log(`🗑️ Eliminando colmena ${colmenaId}`);
@@ -263,6 +345,16 @@ const Colmenas = () => {
         await loadData();
       } catch (err) {
         console.error('❌ Error eliminando colmena:', err);
+        
+        // Manejar errores de autenticación
+        if (err.response && err.response.status === 401) {
+          console.log('🔐 Token expirado durante eliminación...');
+          localStorage.removeItem('smartbee_token');
+          localStorage.removeItem('smartbee_user');
+          window.location.reload();
+          return;
+        }
+        
         setAlertMessage({
           type: 'error',
           message: 'Error al eliminar la colmena'
@@ -287,14 +379,48 @@ const Colmenas = () => {
     });
   };
 
+  const canEditColmena = (colmena) => {
+    if (!currentUser) return false;
+    
+    // Administradores pueden editar cualquier colmena
+    if (currentUser.rol === 'ADM') return true;
+    
+    // Los dueños pueden editar sus propias colmenas
+    if (colmena.dueno === currentUser.id) return true;
+    
+    return false;
+  };
+
+  const canDeleteColmena = () => {
+    return currentUser && currentUser.rol === 'ADM';
+  };
+
+  // Si no está autenticado, mostrar mensaje de carga
+  if (!isAuthenticated) {
+    return <Loading message="Verificando autenticación..." />;
+  }
+
   if (loading && colmenasList.length === 0) {
     return <Loading message="Cargando colmenas..." />;
   }
 
   return (
     <div>
+      {/* Header con información del usuario actual */}
       <div className="flex flex-between flex-center mb-6">
-        <h1 className="page-title" style={{ margin: 0 }}>Colmenas</h1>
+        <div>
+          <h1 className="page-title" style={{ margin: 0 }}>Colmenas</h1>
+          {currentUser && (
+            <p style={{ 
+              fontSize: '0.875rem', 
+              color: '#6b7280', 
+              margin: '4px 0 0 0' 
+            }}>
+              Sesión activa: <strong>{currentUser.nombre} {currentUser.apellido}</strong> 
+              ({currentUser.rol_nombre || currentUser.rol})
+            </p>
+          )}
+        </div>
         <button 
           className="btn btn-primary"
           onClick={() => handleOpenModal()}
@@ -368,6 +494,16 @@ const Colmenas = () => {
                       <div style={{ fontWeight: '500' }}>
                         {getDuenoName(colmena.dueno)}
                       </div>
+                      {/* Indicador si es tu colmena */}
+                      {currentUser && colmena.dueno === currentUser.id && (
+                        <div style={{ 
+                          fontSize: '0.75rem', 
+                          color: '#059669',
+                          fontWeight: '500'
+                        }}>
+                          Mi colmena
+                        </div>
+                      )}
                     </td>
                     <td>
                       {colmena.comuna ? (
@@ -397,23 +533,34 @@ const Colmenas = () => {
                           className="btn btn-secondary btn-sm"
                           onClick={() => handleOpenDetailModal(colmena)}
                           disabled={isSubmitting}
+                          title="Ver detalles"
                         >
                           👁️ Ver
                         </button>
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => handleOpenModal(colmena)}
-                          disabled={isSubmitting}
-                        >
-                          ✏️ Editar
-                        </button>
-                        <button
-                          className="btn btn-danger btn-sm"
-                          onClick={() => handleDelete(colmena.id, colmena.descripcion)}
-                          disabled={isSubmitting}
-                        >
-                          🗑️ Eliminar
-                        </button>
+                        
+                        {/* Solo mostrar editar si tiene permisos */}
+                        {canEditColmena(colmena) && (
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => handleOpenModal(colmena)}
+                            disabled={isSubmitting}
+                            title="Editar colmena"
+                          >
+                            ✏️ Editar
+                          </button>
+                        )}
+                        
+                        {/* Solo mostrar eliminar si es administrador */}
+                        {canDeleteColmena() && (
+                          <button
+                            className="btn btn-danger btn-sm"
+                            onClick={() => handleDelete(colmena.id, colmena.descripcion)}
+                            disabled={isSubmitting}
+                            title="Eliminar colmena (solo administradores)"
+                          >
+                            🗑️ Eliminar
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -460,6 +607,7 @@ const Colmenas = () => {
                 {usuariosList.map((usuario) => (
                   <option key={usuario.id} value={usuario.id}>
                     {usuario.nombre} {usuario.apellido}
+                    {usuario.id === currentUser?.id ? ' (Tú)' : ''}
                   </option>
                 ))}
               </select>
@@ -584,6 +732,16 @@ const Colmenas = () => {
                     <strong>Dueño:</strong>
                     <p style={{ margin: '0.25rem 0 0', color: '#6b7280' }}>
                       {getDuenoName(colmenaDetail.dueno)}
+                      {currentUser && colmenaDetail.dueno === currentUser.id && (
+                        <span style={{ 
+                          marginLeft: '0.5rem',
+                          fontSize: '0.75rem', 
+                          color: '#059669',
+                          fontWeight: '500'
+                        }}>
+                          (Tu colmena)
+                        </span>
+                      )}
                     </p>
                   </div>
                   {colmenaDetail.comuna && (
@@ -614,6 +772,15 @@ const Colmenas = () => {
                   <p style={{ color: '#6b7280' }}>
                     Monitoreando {colmenaDetail.nodos?.length || 0} sensores
                   </p>
+                  {currentUser && (
+                    <div style={{ 
+                      marginTop: '1rem',
+                      fontSize: '0.875rem',
+                      color: '#6b7280'
+                    }}>
+                      Visualizando como: <strong>{currentUser.nombre}</strong>
+                    </div>
+                  )}
                 </div>
               </Card>
             </div>
@@ -661,6 +828,12 @@ const Colmenas = () => {
               }}>
                 <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>📊</div>
                 <p>Datos de sensores y actividad reciente aparecerán aquí</p>
+                <div style={{ 
+                  fontSize: '0.875rem',
+                  marginTop: '1rem'
+                }}>
+                  Acceso: {currentUser?.rol_nombre || currentUser?.rol}
+                </div>
               </div>
             </Card>
           </div>

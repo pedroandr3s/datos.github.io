@@ -26,7 +26,6 @@ const getBaseURL = () => {
   // ✅ Railway funcionando - URL corregida
   return 'https://backend-production-eb26.up.railway.app/api';
 };
-  
 
 // Configuración de axios para conectar al backend
 const api = axios.create({
@@ -37,10 +36,17 @@ const api = axios.create({
   },
 });
 
-// Interceptor para requests
+// Interceptor para agregar token de autenticación
 api.interceptors.request.use(
   (config) => {
     console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    
+    // Agregar token si existe
+    const token = localStorage.getItem('smartbee_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
     return config;
   },
   (error) => {
@@ -58,6 +64,18 @@ api.interceptors.response.use(
   (error) => {
     console.error('❌ Response Error:', error.response?.status, error.message);
     console.error('❌ URL que falló:', error.config?.url);
+    
+    // Si es error 401, limpiar localStorage y redirigir
+    if (error.response?.status === 401) {
+      console.log('🔐 Token expirado o inválido, limpiando sesión...');
+      localStorage.removeItem('smartbee_token');
+      localStorage.removeItem('smartbee_user');
+      // Solo recargar si no estamos ya en login
+      if (!window.location.pathname.includes('login')) {
+        window.location.reload();
+      }
+    }
+    
     return Promise.reject(error);
   }
 );
@@ -165,7 +183,48 @@ export const ApiProvider = ({ children }) => {
     create: (data) => apiRequest('post', '/usuarios', data),
     update: (id, data) => apiRequest('put', `/usuarios/${id}`, data),
     delete: (id) => apiRequest('delete', `/usuarios/${id}`),
-    login: (clave) => apiRequest('post', '/usuarios/login', { clave }),
+    // ✅ Método de login corregido
+    login: async (credentials) => {
+      try {
+        const response = await api.post('/usuarios/login', credentials);
+        
+        if (response.data && response.data.data) {
+          // Guardar token y datos del usuario
+          localStorage.setItem('smartbee_token', response.data.data.token);
+          localStorage.setItem('smartbee_user', JSON.stringify(response.data.data.usuario));
+          
+          console.log('✅ Login exitoso desde ApiContext');
+          return response.data;
+        }
+        
+        throw new Error('Respuesta de login inválida');
+      } catch (error) {
+        console.error('❌ Error en login desde ApiContext:', error);
+        throw error;
+      }
+    },
+    // Método para cerrar sesión
+    logout: () => {
+      localStorage.removeItem('smartbee_token');
+      localStorage.removeItem('smartbee_user');
+      console.log('👋 Sesión cerrada desde ApiContext');
+    },
+    // Método para verificar si está autenticado
+    isAuthenticated: () => {
+      const token = localStorage.getItem('smartbee_token');
+      const user = localStorage.getItem('smartbee_user');
+      return !!(token && user);
+    },
+    // Método para obtener usuario actual
+    getCurrentUser: () => {
+      try {
+        const userData = localStorage.getItem('smartbee_user');
+        return userData ? JSON.parse(userData) : null;
+      } catch (error) {
+        console.error('Error obteniendo usuario actual:', error);
+        return null;
+      }
+    }
   };
 
   const roles = {
@@ -272,6 +331,9 @@ export const ApiProvider = ({ children }) => {
     
     // Configuración de axios
     api,
+    
+    // URL base para referencia
+    baseURL: getBaseURL(),
   };
 
   return (
