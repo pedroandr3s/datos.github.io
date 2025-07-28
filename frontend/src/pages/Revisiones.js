@@ -6,19 +6,279 @@ import Alert from '../components/common/Alert';
 import Modal from '../components/common/Modal';
 import './Revisiones.css';
 
-// IMPORTANTE: Crear este archivo en src/utils/alertSystem.js con el código del sistema de alertas
-import { 
-  analyzeMessage, 
-  generateAlertMessage, 
-  getCategoryColor, 
-  getCategoryIcon, 
-  getPriorityLevel,
-  getAlertStatistics,
-  ALERT_SYSTEM 
-} from '../utils/alertSystem';
+// Sistema de alertas actualizado para el nuevo esquema
+const ALERT_SYSTEM = {
+  // Rangos críticos por tópico
+  RANGES: {
+    temperatura: {
+      critical: { min: 45, max: 5 }, // < 5°C o > 45°C
+      warning: { min: 35, max: 10 },  // 10-35°C es normal
+      unit: '°C',
+      icon: '🌡️'
+    },
+    humedad: {
+      critical: { min: 90, max: 20 }, // < 20% o > 90%
+      warning: { min: 80, max: 30 },  // 30-80% es normal
+      unit: '%',
+      icon: '💧'
+    },
+    peso: {
+      critical: { min: 100, max: 5 }, // < 5kg o > 100kg
+      warning: { min: 80, max: 10 },  // 10-80kg es normal
+      unit: 'kg',
+      icon: '⚖️'
+    },
+    estado: {
+      critical: ['ERROR', 'OFFLINE', 'FAIL'],
+      warning: ['WARNING', 'LOW_BATTERY'],
+      normal: ['OK', 'ONLINE', 'ACTIVE'],
+      icon: '⚙️'
+    }
+  },
+
+  // Mensajes de alerta
+  MESSAGES: {
+    temperatura: {
+      high_critical: '🔥 TEMPERATURA CRÍTICA ALTA - Riesgo de sobrecalentamiento',
+      low_critical: '🧊 TEMPERATURA CRÍTICA BAJA - Riesgo de congelación',
+      high_warning: '⚠️ Temperatura elevada detectada',
+      low_warning: '⚠️ Temperatura baja detectada',
+      suggestions: {
+        high: [
+          'Verificar ventilación del apiario',
+          'Proporcionar sombra adicional',
+          'Revisar sistemas de enfriamiento',
+          'Monitorear hidratación de las abejas'
+        ],
+        low: [
+          'Verificar aislamiento de la colmena',
+          'Revisar calefacción si está disponible',
+          'Proteger del viento frío',
+          'Considerar alimentación energética'
+        ]
+      }
+    },
+    humedad: {
+      high_critical: '💧 HUMEDAD CRÍTICA ALTA - Riesgo de hongos y enfermedades',
+      low_critical: '🏜️ HUMEDAD CRÍTICA BAJA - Riesgo de deshidratación',
+      high_warning: '⚠️ Humedad elevada detectada',
+      low_warning: '⚠️ Humedad baja detectada',
+      suggestions: {
+        high: [
+          'Mejorar ventilación de la colmena',
+          'Revisar drenaje del apiario',
+          'Verificar fuentes de agua cercanas',
+          'Monitorear signos de hongos'
+        ],
+        low: [
+          'Proporcionar fuentes de agua',
+          'Verificar bebederos para abejas',
+          'Revisar humidificación natural',
+          'Monitorear estrés de las abejas'
+        ]
+      }
+    },
+    peso: {
+      high_critical: '⚖️ PESO CRÍTICO ALTO - Posible sobrecarga estructural',
+      low_critical: '⚖️ PESO CRÍTICO BAJO - Posible pérdida de población',
+      high_warning: '⚠️ Peso elevado detectado',
+      low_warning: '⚠️ Peso bajo detectado',
+      suggestions: {
+        high: [
+          'Verificar integridad estructural',
+          'Revisar si necesita cosecha',
+          'Comprobar acumulación de miel',
+          'Evaluar expansión de la colmena'
+        ],
+        low: [
+          'Verificar población de abejas',
+          'Revisar reservas de miel',
+          'Comprobar salud de la colonia',
+          'Considerar alimentación suplementaria'
+        ]
+      }
+    },
+    estado: {
+      error: '🚨 ESTADO CRÍTICO - Sistema en fallo',
+      offline: '📡 CONEXIÓN PERDIDA - Nodo desconectado',
+      fail: '❌ FALLO GENERAL - Revisión inmediata requerida',
+      suggestions: {
+        error: [
+          'Verificar alimentación del nodo',
+          'Revisar conexiones de sensores',
+          'Comprobar integridad del hardware',
+          'Contactar soporte técnico'
+        ],
+        offline: [
+          'Verificar conectividad de red',
+          'Revisar configuración WiFi',
+          'Comprobar cobertura de señal',
+          'Reiniciar dispositivo si es necesario'
+        ]
+      }
+    }
+  }
+};
+
+// Función para analizar mensajes y detectar alertas
+const analyzeMessage = (topico, payload) => {
+  const topic = topico.toLowerCase();
+  const ranges = ALERT_SYSTEM.RANGES[topic];
+  
+  if (!ranges) {
+    return {
+      category: 'unknown',
+      priority: 'normal',
+      message: 'Tópico desconocido',
+      color: '#6b7280',
+      icon: '❓',
+      range: null,
+      suggestions: []
+    };
+  }
+
+  // Análisis para valores numéricos
+  if (typeof ranges.critical === 'object' && 'min' in ranges.critical) {
+    const numericValue = extractNumericValue(payload);
+    
+    if (numericValue !== null) {
+      // Verificar crítico
+      if (numericValue > ranges.critical.min || numericValue < ranges.critical.max) {
+        const isHigh = numericValue > ranges.critical.min;
+        const messageKey = isHigh ? 'high_critical' : 'low_critical';
+        const suggestionKey = isHigh ? 'high' : 'low';
+        
+        return {
+          category: 'critical',
+          priority: 'urgent',
+          message: ALERT_SYSTEM.MESSAGES[topic][messageKey],
+          color: '#dc2626',
+          icon: '🚨',
+          range: `Crítico: <${ranges.critical.max}${ranges.unit} o >${ranges.critical.min}${ranges.unit}`,
+          suggestions: ALERT_SYSTEM.MESSAGES[topic].suggestions[suggestionKey] || []
+        };
+      }
+      
+      // Verificar advertencia
+      if (numericValue > ranges.warning.min || numericValue < ranges.warning.max) {
+        const isHigh = numericValue > ranges.warning.min;
+        const messageKey = isHigh ? 'high_warning' : 'low_warning';
+        const suggestionKey = isHigh ? 'high' : 'low';
+        
+        return {
+          category: 'warning',
+          priority: 'high',
+          message: ALERT_SYSTEM.MESSAGES[topic][messageKey],
+          color: '#f59e0b',
+          icon: '⚠️',
+          range: `Advertencia: ${ranges.warning.max}-${ranges.warning.min}${ranges.unit}`,
+          suggestions: ALERT_SYSTEM.MESSAGES[topic].suggestions[suggestionKey] || []
+        };
+      }
+      
+      // Valor normal
+      return {
+        category: 'normal',
+        priority: 'normal',
+        message: `Valor normal: ${numericValue}${ranges.unit}`,
+        color: '#10b981',
+        icon: '✅',
+        range: `Normal: ${ranges.warning.max}-${ranges.warning.min}${ranges.unit}`,
+        suggestions: []
+      };
+    }
+  }
+
+  // Análisis para valores de estado
+  if (Array.isArray(ranges.critical)) {
+    const value = payload.toUpperCase();
+    
+    if (ranges.critical.includes(value)) {
+      const messageKey = value.toLowerCase();
+      return {
+        category: 'critical',
+        priority: 'urgent',
+        message: ALERT_SYSTEM.MESSAGES[topic][messageKey] || `Estado crítico: ${value}`,
+        color: '#dc2626',
+        icon: '🚨',
+        range: `Crítico: ${ranges.critical.join(', ')}`,
+        suggestions: ALERT_SYSTEM.MESSAGES[topic].suggestions[messageKey] || []
+      };
+    }
+    
+    if (ranges.warning.includes(value)) {
+      return {
+        category: 'warning',
+        priority: 'high',
+        message: `Estado de advertencia: ${value}`,
+        color: '#f59e0b',
+        icon: '⚠️',
+        range: `Advertencia: ${ranges.warning.join(', ')}`,
+        suggestions: []
+      };
+    }
+    
+    if (ranges.normal.includes(value)) {
+      return {
+        category: 'normal',
+        priority: 'normal',
+        message: `Estado normal: ${value}`,
+        color: '#10b981',
+        icon: '✅',
+        range: `Normal: ${ranges.normal.join(', ')}`,
+        suggestions: []
+      };
+    }
+  }
+
+  return {
+    category: 'unknown',
+    priority: 'normal',
+    message: 'Valor no reconocido',
+    color: '#6b7280',
+    icon: '❓',
+    range: null,
+    suggestions: []
+  };
+};
+
+// Función para extraer valor numérico del payload
+const extractNumericValue = (payload) => {
+  const match = payload.match(/(\d+\.?\d*)/);
+  return match ? parseFloat(match[1]) : null;
+};
+
+// Función para generar mensaje de alerta
+const generateAlertMessage = (nodoId, topico, analysis) => {
+  return `${analysis.icon} ALERTA en Nodo ${nodoId}: ${analysis.message}`;
+};
+
+// Función para obtener estadísticas de alertas
+const getAlertStatistics = (mensajes) => {
+  const stats = {
+    total: mensajes.length,
+    critical: 0,
+    warning: 0,
+    normal: 0,
+    unknown: 0
+  };
+
+  mensajes.forEach(mensaje => {
+    const analysis = analyzeMessage(mensaje.topico, mensaje.payload);
+    stats[analysis.category]++;
+  });
+
+  return stats;
+};
+
+// Función para obtener nivel de prioridad numérico
+const getPriorityLevel = (priority) => {
+  const levels = { urgent: 4, high: 3, medium: 2, normal: 1 };
+  return levels[priority] || 1;
+};
 
 const Revisiones = () => {
-  const { mensajes, nodos, colmenas, nodoTipos, loading, error } = useApi();
+  const { nodoMensajes, nodos, colmenas, nodoTipos, loading, error } = useApi();
   
   // Estados principales
   const [mensajesList, setMensajesList] = useState([]);
@@ -76,7 +336,7 @@ const Revisiones = () => {
 
   // Estados para gráficos
   const [chartData, setChartData] = useState([]);
-  const [chartTimeScale, setChartTimeScale] = useState('segundo');
+  const [chartTimeScale, setChartTimeScale] = useState('minuto');
   const [realTimeData, setRealTimeData] = useState(new Map());
 
   // Effects
@@ -136,7 +396,7 @@ const Revisiones = () => {
     try {
       console.log('🔄 Cargando datos iniciales...');
       const [mensajesData, nodosData, colmenasData, tiposData] = await Promise.all([
-        mensajes.getRecientes(24),
+        nodoMensajes.getRecientes ? nodoMensajes.getRecientes(24) : nodoMensajes.getAll(),
         nodos.getAll(),
         colmenas.getAll(),
         nodoTipos.getAll()
@@ -196,11 +456,6 @@ const Revisiones = () => {
     }
   };
 
-  const extractNumericValue = (payload) => {
-    const match = payload.match(/(\d+\.?\d*)/);
-    return match ? parseFloat(match[1]) : null;
-  };
-
   const generateSampleData = async () => {
     if (isGeneratingData) {
       console.log('⚠️ Ya se está generando datos, esperando...');
@@ -234,22 +489,23 @@ const Revisiones = () => {
   };
 
   const createBaseSampleData = async () => {
+    // Usar nodos reales si están disponibles, sino crear datos de ejemplo
     const nodosDisponibles = nodosList.length > 0 ? nodosList : [
-      { id: 1 }, { id: 2 }, { id: 3 }
+      { id: 'NODE001' }, { id: 'NODE002' }, { id: 'NODE003' }
     ];
 
     const sampleData = [
-      { nodo_id: nodosDisponibles[0]?.id || 1, topico: 'temperatura', payload: '25.5°C' },
-      { nodo_id: nodosDisponibles[0]?.id || 1, topico: 'humedad', payload: '55%' },
-      { nodo_id: nodosDisponibles[1]?.id || 2, topico: 'temperatura', payload: '36.8°C' },
-      { nodo_id: nodosDisponibles[1]?.id || 2, topico: 'humedad', payload: '72%' },
-      { nodo_id: nodosDisponibles[2]?.id || 3, topico: 'temperatura', payload: '39.2°C' },
-      { nodo_id: nodosDisponibles[2]?.id || 3, topico: 'humedad', payload: '45%' }
+      { nodo_id: nodosDisponibles[0]?.id || 'NODE001', topico: 'temperatura', payload: '25.5°C' },
+      { nodo_id: nodosDisponibles[0]?.id || 'NODE001', topico: 'humedad', payload: '55%' },
+      { nodo_id: nodosDisponibles[0]?.id || 'NODE001', topico: 'peso', payload: '42.3kg' },
+      { nodo_id: nodosDisponibles[1]?.id || 'NODE002', topico: 'temperatura', payload: '46.8°C' }, // Crítico
+      { nodo_id: nodosDisponibles[1]?.id || 'NODE002', topico: 'humedad', payload: '15%' }, // Crítico
+      { nodo_id: nodosDisponibles[2]?.id || 'NODE003', topico: 'estado', payload: 'ERROR' } // Crítico
     ];
 
     const promises = sampleData.map(async (data) => {
       try {
-        await mensajes.create(data);
+        await nodoMensajes.create(data);
         const analysis = analyzeMessage(data.topico, data.payload);
         console.log(`✅ Dato creado: Nodo ${data.nodo_id}, ${data.topico}: ${data.payload} - ${analysis.category.toUpperCase()}`);
         return data;
@@ -275,16 +531,17 @@ const Revisiones = () => {
     try {
       const promises = Array.from(realTimeData.entries()).map(async ([key, data]) => {
         let variation;
+        let newPayload;
         
-        if (Math.random() < 0.2) {
-          variation = (Math.random() - 0.5) * 0.6;
+        // Simular variaciones más extremas ocasionalmente para generar alertas
+        if (Math.random() < 0.15) { // 15% probabilidad de generar valor crítico
+          variation = (Math.random() - 0.5) * 1.5; // Variación más extrema
         } else {
-          variation = (Math.random() - 0.5) * 0.3;
+          variation = (Math.random() - 0.5) * 0.2; // Variación normal
         }
         
         const newValue = Math.max(0, data.value * (1 + variation));
         
-        let newPayload;
         switch (data.topico.toLowerCase()) {
           case 'temperatura':
             newPayload = `${newValue.toFixed(1)}°C`;
@@ -292,8 +549,12 @@ const Revisiones = () => {
           case 'humedad':
             newPayload = `${Math.round(newValue)}%`;
             break;
-          case 'presion':
-            newPayload = `${newValue.toFixed(0)} hPa`;
+          case 'peso':
+            newPayload = `${newValue.toFixed(1)}kg`;
+            break;
+          case 'estado':
+            const estados = Math.random() < 0.1 ? ['ERROR', 'OFFLINE'] : ['OK', 'ACTIVE', 'ONLINE'];
+            newPayload = estados[Math.floor(Math.random() * estados.length)];
             break;
           default:
             newPayload = newValue.toFixed(1);
@@ -309,7 +570,7 @@ const Revisiones = () => {
           payload: newPayload
         };
 
-        await mensajes.create(nuevoMensaje);
+        await nodoMensajes.create(nuevoMensaje);
         return { key, value: newValue, timestamp: new Date(), payload: newPayload, analysis };
       });
 
@@ -321,6 +582,7 @@ const Revisiones = () => {
         console.log(`🚨 Se generaron ${alertasGeneradas} alertas críticas`);
       }
       
+      // Actualizar datos en tiempo real
       const newRealTimeData = new Map(realTimeData);
       results.forEach(({ key, value, timestamp, analysis }) => {
         if (newRealTimeData.has(key)) {
@@ -334,6 +596,7 @@ const Revisiones = () => {
       });
       setRealTimeData(newRealTimeData);
 
+      // Actualizar gráfico
       const newChartPoint = {
         timestamp: new Date(),
         data: {}
@@ -349,8 +612,11 @@ const Revisiones = () => {
         return updated.slice(-maxPoints);
       });
 
+      // Recargar mensajes
       console.log('🔄 Recargando lista de mensajes...');
-      const mensajesActualizados = await mensajes.getRecientes(24);
+      const mensajesActualizados = await nodoMensajes.getRecientes ? 
+        nodoMensajes.getRecientes(24) : 
+        nodoMensajes.getAll();
       setMensajesList(mensajesActualizados || []);
 
     } catch (error) {
@@ -467,7 +733,7 @@ const Revisiones = () => {
     setEstadisticas(stats);
   };
 
-  // CRUD Functions
+  // CRUD Functions actualizadas para el nuevo esquema
   const handleCreateMensaje = () => {
     setFormData({
       nodo_id: '',
@@ -487,6 +753,8 @@ const Revisiones = () => {
     
     if (!formData.topico || !formData.topico.trim()) {
       errors.topico = 'El tópico es requerido';
+    } else if (formData.topico.trim().length > 255) {
+      errors.topico = 'El tópico no puede exceder 255 caracteres';
     }
     
     if (!formData.payload || !formData.payload.trim()) {
@@ -508,14 +776,14 @@ const Revisiones = () => {
 
     try {
       const dataToSend = {
-        nodo_id: parseInt(formData.nodo_id),
+        nodo_id: formData.nodo_id, // Mantener como string para el nuevo esquema
         topico: formData.topico.trim(),
         payload: formData.payload.trim()
       };
 
       const analysis = analyzeMessage(dataToSend.topico, dataToSend.payload);
       
-      await mensajes.create(dataToSend);
+      await nodoMensajes.create(dataToSend);
       
       let messageType = 'success';
       let message = 'Mensaje creado correctamente';
@@ -549,7 +817,7 @@ const Revisiones = () => {
   const handleDeleteMensaje = async (mensajeId, topico) => {
     if (window.confirm(`¿Estás seguro de que deseas eliminar el mensaje "${topico}"?`)) {
       try {
-        await mensajes.delete(mensajeId);
+        await nodoMensajes.delete(mensajeId);
         setAlertMessage({
           type: 'success',
           message: 'Mensaje eliminado correctamente'
@@ -627,7 +895,7 @@ const Revisiones = () => {
     loadData();
   };
 
-  // Helper functions
+  // Helper functions actualizadas para el nuevo esquema
   const getNodoInfo = (nodoId) => {
     const nodo = nodosList.find(n => n.id === nodoId);
     if (!nodo) return { descripcion: `Nodo ${nodoId}`, tipo: 'Desconocido' };
@@ -643,6 +911,7 @@ const Revisiones = () => {
     const baseColors = {
       'temperatura': { class: 'badge-warning', icon: '🌡️' },
       'humedad': { class: 'badge-info', icon: '💧' },
+      'peso': { class: 'badge-primary', icon: '⚖️' },
       'estado': { class: 'badge-success', icon: '⚙️' },
       'presion': { class: 'badge-primary', icon: '🔘' },
       'luz': { class: 'badge-warning', icon: '💡' },
@@ -689,6 +958,8 @@ const Revisiones = () => {
         return `${numValue}°C`;
       case 'humedad':
         return `${numValue}%`;
+      case 'peso':
+        return `${numValue}kg`;
       case 'presion':
         return `${numValue} hPa`;
       default:
@@ -888,7 +1159,7 @@ const Revisiones = () => {
       {/* Header con controles mejorados */}
       <div className="page-header">
         <div className="header-left">
-          <h2>Sistema de Revisiones y Alertas</h2>
+          <h2>Sistema de Revisiones y Alertas SmartBee</h2>
           <p className="page-subtitle">
             Monitoreo en tiempo real con detección automática de alertas críticas
           </p>
@@ -1005,7 +1276,7 @@ const Revisiones = () => {
                     <strong>{alert.analysis.message}</strong>
                   </div>
                   <div className="alert-details">
-                    Nodo #{alert.nodo_id} • {alert.topico} • {alert.payload}
+                    Nodo {alert.nodo_id} • {alert.topico} • {alert.payload}
                   </div>
                   <div className="alert-time">
                     {formatearFecha(alert.fecha)}
@@ -1081,7 +1352,7 @@ const Revisiones = () => {
           <div className="node-stats">
             {Object.entries(estadisticas.porNodo).map(([nodoId, count]) => (
               <div key={nodoId} className="node-stat-item">
-                <span>Nodo #{nodoId}</span>
+                <span>Nodo {nodoId}</span>
                 <span className="count">{count}</span>
               </div>
             ))}
@@ -1132,7 +1403,7 @@ const Revisiones = () => {
                 <div key={key} className="legend-item">
                   <div className="legend-color" style={{ backgroundColor: color }}></div>
                   <span className="legend-label">
-                    {topico} (Nodo #{nodoId})
+                    {topico} (Nodo {nodoId})
                   </span>
                   <span className="legend-value">
                     {formatearValorTiempoReal(data.value, topico)}
@@ -1147,7 +1418,6 @@ const Revisiones = () => {
           </div>
         )}
       </Card>
-
       {/* Lista de mensajes */}
       <Card 
         title={`💬 Mensajes Recientes (${filteredMensajes.length})`}
@@ -1198,7 +1468,7 @@ const Revisiones = () => {
                     <div className="mensaje-id">
                       <span className="id-label">#{mensaje.id}</span>
                       <span className="nodo-info">
-                        Nodo #{mensaje.nodo_id} - {nodoInfo.descripcion}
+                        Nodo {mensaje.nodo_id} - {nodoInfo.descripcion}
                       </span>
                     </div>
                     <div className="mensaje-time">
@@ -1309,7 +1579,7 @@ const Revisiones = () => {
                     {selectedAlert.analysis.message}
                   </h3>
                   <p style={{ margin: '0.25rem 0 0', color: '#7f1d1d' }}>
-                    Nodo #{selectedAlert.nodo_id} - {selectedAlert.topico.toUpperCase()}
+                    Nodo {selectedAlert.nodo_id} - {selectedAlert.topico.toUpperCase()}
                   </p>
                 </div>
               </div>
@@ -1394,7 +1664,7 @@ const Revisiones = () => {
       <Modal
         isOpen={isCreateModalOpen}
         onClose={handleCloseCreateModal}
-        title="Nuevo Mensaje"
+        title="Nuevo Mensaje de Nodo"
         size="md"
       >
         <form onSubmit={handleSubmitMensaje}>
@@ -1409,7 +1679,7 @@ const Revisiones = () => {
               <option value="">Selecciona un nodo</option>
               {nodosList.map((nodo) => (
                 <option key={nodo.id} value={nodo.id}>
-                  Nodo #{nodo.id} - {nodo.descripcion}
+                  Nodo {nodo.id} - {nodo.descripcion}
                 </option>
               ))}
             </select>
@@ -1419,7 +1689,7 @@ const Revisiones = () => {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Tópico *</label>
+            <label className="form-label">Tópico * (máx. 255 caracteres)</label>
             <select
               className={`form-select ${formErrors.topico ? 'error' : ''}`}
               value={formData.topico}
@@ -1429,7 +1699,11 @@ const Revisiones = () => {
               <option value="">Selecciona un tópico</option>
               <option value="temperatura">🌡️ Temperatura</option>
               <option value="humedad">💧 Humedad</option>
-              <option value="peso">⚙️ Peso</option>
+              <option value="peso">⚖️ Peso</option>
+              <option value="estado">⚙️ Estado</option>
+              <option value="presion">🔘 Presión</option>
+              <option value="luz">💡 Luz</option>
+              <option value="sonido">🔊 Sonido</option>
             </select>
             {formErrors.topico && (
               <div className="error-message">{formErrors.topico}</div>
@@ -1445,7 +1719,7 @@ const Revisiones = () => {
               onChange={(e) => {
                 setFormData({...formData, payload: e.target.value});
               }}
-              placeholder="Ej: 25.5°C, 80%, ON/OFF, etc."
+              placeholder="Ej: 25.5°C, 80%, 42.3kg, OK, ERROR, etc."
               disabled={isSubmitting}
             />
             {formErrors.payload && (
@@ -1459,7 +1733,7 @@ const Revisiones = () => {
                   const analysis = analyzeMessage(formData.topico, formData.payload);
                   return (
                     <div style={{
-                      padding: '0.5rem',
+                      padding: '0.75rem',
                       borderRadius: '0.375rem',
                       fontSize: '0.875rem',
                       backgroundColor: analysis.category === 'critical' ? '#fef2f2' :
@@ -1467,11 +1741,24 @@ const Revisiones = () => {
                       border: `1px solid ${analysis.color}`,
                       color: analysis.color
                     }}>
-                      <span style={{ marginRight: '0.5rem' }}>{analysis.icon}</span>
-                      <strong>Preview:</strong> {analysis.message}
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <span style={{ marginRight: '0.5rem', fontSize: '1.1rem' }}>{analysis.icon}</span>
+                        <strong>Preview del Sistema de Alertas:</strong>
+                      </div>
+                      <div>{analysis.message}</div>
                       {analysis.category === 'critical' && (
-                        <div style={{ marginTop: '0.25rem', fontSize: '0.75rem' }}>
-                          ⚠️ Este valor generará una alerta crítica
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                          ⚠️ Este valor generará una ALERTA CRÍTICA automáticamente
+                        </div>
+                      )}
+                      {analysis.category === 'warning' && (
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}>
+                          ⚠️ Este valor generará una alerta preventiva
+                        </div>
+                      )}
+                      {analysis.range && (
+                        <div style={{ marginTop: '0.25rem', fontSize: '0.75rem', opacity: 0.8 }}>
+                          {analysis.range}
                         </div>
                       )}
                     </div>
@@ -1481,7 +1768,11 @@ const Revisiones = () => {
             )}
             
             <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-              Ejemplos: "25.5°C", "80%", "ON", "1024", "Normal"
+              <strong>Ejemplos por tópico:</strong><br/>
+              • Temperatura: "25.5°C", "46.8°C" (crítico), "2.1°C" (crítico)<br/>
+              • Humedad: "55%", "95%" (crítico), "15%" (crítico)<br/>
+              • Peso: "42.3kg", "105kg" (crítico), "3kg" (crítico)<br/>
+              • Estado: "OK", "ERROR" (crítico), "OFFLINE" (crítico)
             </div>
           </div>
 
@@ -1523,7 +1814,7 @@ const Revisiones = () => {
               <option value="">Todos los nodos</option>
               {nodosList.map((nodo) => (
                 <option key={nodo.id} value={nodo.id}>
-                  Nodo #{nodo.id} - {nodo.descripcion}
+                  Nodo {nodo.id} - {nodo.descripcion}
                 </option>
               ))}
             </select>
@@ -1536,7 +1827,7 @@ const Revisiones = () => {
               className="form-input"
               value={filters.topico}
               onChange={(e) => setFilters({...filters, topico: e.target.value})}
-              placeholder="temperatura, humedad, estado..."
+              placeholder="temperatura, humedad, peso, estado..."
             />
           </div>
 
@@ -1683,7 +1974,7 @@ const Revisiones = () => {
                     <div>
                       <strong>Nodo:</strong>
                       <p style={{ margin: '0.25rem 0 0', color: '#6b7280' }}>
-                        Nodo #{selectedMensaje.nodo_id} - {getNodoInfo(selectedMensaje.nodo_id).descripcion}
+                        Nodo {selectedMensaje.nodo_id} - {getNodoInfo(selectedMensaje.nodo_id).descripcion}
                       </p>
                     </div>
 
@@ -1713,7 +2004,8 @@ const Revisiones = () => {
                       <div style={{ 
                         margin: '0.5rem 0 0',
                         padding: '1rem',
-                        backgroundColor: analysis.category === 'critical' ? '#fef2f2' : '#f9fafb',
+                        backgroundColor: analysis.category === 'critical' ? '#fef2f2' : 
+                                        analysis.category === 'warning' ? '#fffbeb' : '#f9fafb',
                         borderRadius: '0.375rem',
                         border: `2px solid ${analysis.color}`,
                         fontFamily: 'monospace',

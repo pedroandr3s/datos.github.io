@@ -14,6 +14,7 @@ const Usuarios = () => {
   const [alertMessage, setAlertMessage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
+    id: '', // Agregado para nuevos usuarios
     nombre: '',
     apellido: '',
     clave: '',
@@ -48,14 +49,19 @@ const Usuarios = () => {
     }
   };
 
-  // NUEVA FUNCIÓN: Obtener rol ID desde rol_nombre si no existe rol
-  const getRolIdFromName = (rolNombre) => {
-    if (!rolNombre || !rolesList || rolesList.length === 0) {
+  // Obtener rol por clave (varchar)
+  const getRolByKey = (rolKey) => {
+    if (!rolKey || !rolesList || rolesList.length === 0) {
       return null;
     }
     
-    const rol = rolesList.find(r => r.descripcion === rolNombre);
-    return rol ? (rol.rol || rol.id) : null;
+    return rolesList.find(r => r.rol === rolKey);
+  };
+
+  // Obtener nombre del rol desde la clave
+  const getRolNameFromKey = (rolKey) => {
+    const rol = getRolByKey(rolKey);
+    return rol ? rol.descripcion : 'Sin rol';
   };
 
   const handleOpenModal = (user = null) => {
@@ -63,22 +69,17 @@ const Usuarios = () => {
       console.log('📝 Editando usuario:', user);
       setEditingUser(user);
       
-      // CORREGIDO: Obtener el rol ID, con fallback a rol_nombre
-      let rolId = user.rol;
-      if (!rolId && user.rol_nombre) {
-        rolId = getRolIdFromName(user.rol_nombre);
-        console.log(`🔄 Rol ID obtenido desde rol_nombre "${user.rol_nombre}": ${rolId}`);
-      }
-      
       setFormData({
+        id: user.id || '',
         nombre: user.nombre || '',
         apellido: user.apellido || '',
-        clave: '',
-        rol: rolId || ''
+        clave: '', 
+        rol: user.rol || '' 
       });
     } else {
       setEditingUser(null);
       setFormData({
+        id: '',
         nombre: '',
         apellido: '',
         clave: '',
@@ -93,6 +94,7 @@ const Usuarios = () => {
     setIsModalOpen(false);
     setEditingUser(null);
     setFormData({
+      id: '',
       nombre: '',
       apellido: '',
       clave: '',
@@ -105,16 +107,28 @@ const Usuarios = () => {
   const validateForm = () => {
     const errors = {};
     
+    if (!editingUser && (!formData.id || !formData.id.trim())) {
+      errors.id = 'El ID es requerido';
+    } else if (!editingUser && formData.id.trim().length > 16) {
+      errors.id = 'El ID no puede exceder 16 caracteres';
+    }
+    
     if (!formData.nombre || !formData.nombre.trim()) {
       errors.nombre = 'El nombre es requerido';
+    } else if (formData.nombre.trim().length > 100) {
+      errors.nombre = 'El nombre no puede exceder 100 caracteres';
     }
     
     if (!formData.apellido || !formData.apellido.trim()) {
       errors.apellido = 'El apellido es requerido';
+    } else if (formData.apellido.trim().length > 100) {
+      errors.apellido = 'El apellido no puede exceder 100 caracteres';
     }
     
     if (!editingUser && (!formData.clave || !formData.clave.trim())) {
       errors.clave = 'La clave es requerida';
+    } else if (formData.clave && formData.clave.trim().length > 64) {
+      errors.clave = 'La clave no puede exceder 64 caracteres';
     }
     
     if (!formData.rol) {
@@ -140,8 +154,12 @@ const Usuarios = () => {
       const dataToSend = {
         nombre: formData.nombre.trim(),
         apellido: formData.apellido.trim(),
-        rol: parseInt(formData.rol)
+        rol: formData.rol.trim() // Add .trim() here!
       };
+      
+      if (!editingUser) {
+        dataToSend.id = formData.id.trim();
+      }
       
       if (formData.clave && formData.clave.trim()) {
         dataToSend.clave = formData.clave.trim();
@@ -175,6 +193,8 @@ const Usuarios = () => {
       let errorMessage = `Error al ${editingUser ? 'actualizar' : 'crear'} el usuario`;
       if (err.response && err.response.data && err.response.data.error) {
         errorMessage = err.response.data.error;
+      } else if (err.message) {
+        errorMessage = err.message;
       }
       
       setAlertMessage({
@@ -212,52 +232,46 @@ const Usuarios = () => {
     }
   };
 
-  // CORREGIDO: Función para obtener el nombre del rol con múltiples fallbacks
+  const handleMantenedorColmenas = (usuario) => {
+    console.log('🏠 Abriendo mantenedor de colmenas para usuario:', usuario);
+ 
+    setAlertMessage({
+      type: 'info',
+      message: `Mantenedor de colmenas para ${usuario.nombre} ${usuario.apellido}`
+    });
+  };
+
   const getRoleName = (usuario) => {
     console.log('🔍 Obteniendo nombre del rol para usuario:', usuario);
     
-    // Opción 1: Si ya tiene rol_nombre, usarlo directamente
-    if (usuario.rol_nombre && usuario.rol_nombre !== 'Usuario') {
-      console.log('✅ Usando rol_nombre directo:', usuario.rol_nombre);
-      return usuario.rol_nombre;
+    if (usuario.rol) {
+      return getRolNameFromKey(usuario.rol);
     }
     
-    // Opción 2: Si tiene rol (ID), buscar en la lista de roles
-    if (usuario.rol && rolesList && rolesList.length > 0) {
-      const rol = rolesList.find(r => {
-        return (r.rol && r.rol === parseInt(usuario.rol)) || (r.id && r.id === parseInt(usuario.rol));
-      });
-      
-      if (rol) {
-        console.log('✅ Rol encontrado por ID:', rol);
-        return rol.descripcion;
-      }
-    }
-    
-    // Opción 3: Fallback
-    console.log('⚠️ No se encontró rol, usando fallback');
+    console.log('⚠️ Usuario sin rol asignado');
     return 'Sin rol';
   };
 
   const getRoleBadgeClass = (usuario) => {
-    // Intentar obtener el ID del rol
-    let rolId = usuario.rol;
+    const rolKey = usuario.rol;
     
-    // Si no tiene rol pero tiene rol_nombre, intentar obtener el ID
-    if (!rolId && usuario.rol_nombre) {
-      rolId = getRolIdFromName(usuario.rol_nombre);
-    }
-    
-    const rolIdNum = parseInt(rolId);
-    switch (rolIdNum) {
-      case 1:
-        return 'badge-danger';   // Administrador - Rojo
-      case 2:
-        return 'badge-success';  // Apicultor - Verde
-      case 3:
-        return 'badge-info';     // Investigador - Azul
+    switch (rolKey) {
+      case 'ADM':
+        return 'badge-danger';  
+      case 'API':
+        return 'badge-success';  
+      case 'USR':
+        return 'badge-info';     
       default:
-        return 'badge-secondary';
+        return 'badge-secondary'; 
+    }
+  };
+
+  const getStatusBadge = (usuario) => {
+    if (usuario.activo === 1 || usuario.activo === true) {
+      return <span className="badge badge-success">Activo</span>;
+    } else {
+      return <span className="badge badge-secondary">Inactivo</span>;
     }
   };
 
@@ -309,6 +323,7 @@ const Usuarios = () => {
                   <th>ID</th>
                   <th>Nombre Completo</th>
                   <th>Rol</th>
+                  <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -321,9 +336,10 @@ const Usuarios = () => {
                       <td>
                         <span style={{ 
                           fontWeight: '600', 
-                          color: '#374151' 
+                          color: '#374151',
+                          fontFamily: 'monospace'
                         }}>
-                          #{usuario.id}
+                          {usuario.id}
                         </span>
                       </td>
                       <td>
@@ -335,7 +351,7 @@ const Usuarios = () => {
                             fontSize: '0.875rem', 
                             color: '#6b7280' 
                           }}>
-                            Usuario ID: {usuario.id}
+                            ID: {usuario.id}
                           </div>
                         </div>
                       </td>
@@ -343,13 +359,23 @@ const Usuarios = () => {
                         <span className={`badge ${getRoleBadgeClass(usuario)}`}>
                           {getRoleName(usuario)}
                         </span>
-                        {/* DEBUG: Mostrar información de debug */}
                         <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '2px' }}>
-                          {usuario.rol ? `ID: ${usuario.rol}` : `Nombre: ${usuario.rol_nombre}`}
+                          Clave: {usuario.rol || 'N/A'}
                         </div>
                       </td>
                       <td>
+                        {getStatusBadge(usuario)}
+                      </td>
+                      <td>
                         <div className="flex flex-gap">
+                          <button
+                            className="btn btn-info btn-sm"
+                            onClick={() => handleMantenedorColmenas(usuario)}
+                            disabled={isSubmitting}
+                            title="Mantenedor de Colmenas"
+                          >
+                            🏠 Colmenas
+                          </button>
                           <button
                             className="btn btn-secondary btn-sm"
                             onClick={() => handleOpenModal(usuario)}
@@ -375,7 +401,6 @@ const Usuarios = () => {
         )}
       </Card>
 
-      {/* Modal para crear/editar usuario */}
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
@@ -383,14 +408,37 @@ const Usuarios = () => {
         size="md"
       >
         <form onSubmit={handleSubmit}>
+          {!editingUser && (
+            <div className="form-group">
+              <label className="form-label">ID de Usuario * (máx. 16 caracteres)</label>
+              <input
+                type="text"
+                className={`form-input ${formErrors.id ? 'error' : ''}`}
+                value={formData.id}
+                onChange={(e) => setFormData({...formData, id: e.target.value})}
+                placeholder="Ej: user001, admin, etc."
+                maxLength="16"
+                disabled={isSubmitting}
+                style={{ fontFamily: 'monospace' }}
+              />
+              {formErrors.id && (
+                <div className="error-message">{formErrors.id}</div>
+              )}
+              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>
+                Este será el identificador único del usuario
+              </div>
+            </div>
+          )}
+
           <div className="form-group">
-            <label className="form-label">Nombre *</label>
+            <label className="form-label">Nombre * (máx. 100 caracteres)</label>
             <input
               type="text"
               className={`form-input ${formErrors.nombre ? 'error' : ''}`}
               value={formData.nombre}
               onChange={(e) => setFormData({...formData, nombre: e.target.value})}
               placeholder="Ingresa el nombre"
+              maxLength="100"
               disabled={isSubmitting}
             />
             {formErrors.nombre && (
@@ -399,13 +447,14 @@ const Usuarios = () => {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Apellido *</label>
+            <label className="form-label">Apellido * (máx. 100 caracteres)</label>
             <input
               type="text"
               className={`form-input ${formErrors.apellido ? 'error' : ''}`}
               value={formData.apellido}
               onChange={(e) => setFormData({...formData, apellido: e.target.value})}
               placeholder="Ingresa el apellido"
+              maxLength="100"
               disabled={isSubmitting}
             />
             {formErrors.apellido && (
@@ -415,7 +464,7 @@ const Usuarios = () => {
 
           <div className="form-group">
             <label className="form-label">
-              Clave {editingUser ? '(dejar vacío para mantener actual)' : '*'}
+              Clave {editingUser ? '(dejar vacío para mantener actual)' : '*'} (máx. 64 caracteres)
             </label>
             <input
               type="password"
@@ -423,6 +472,7 @@ const Usuarios = () => {
               value={formData.clave}
               onChange={(e) => setFormData({...formData, clave: e.target.value})}
               placeholder={editingUser ? "Nueva clave (opcional)" : "Ingresa la clave"}
+              maxLength="64"
               disabled={isSubmitting}
             />
             {formErrors.clave && (
@@ -442,21 +492,18 @@ const Usuarios = () => {
               disabled={isSubmitting}
             >
               <option value="">Selecciona un rol</option>
-              {rolesList.map((rol) => {
-                const rolId = rol.rol || rol.id;
-                return (
-                  <option key={rolId} value={rolId}>
-                    {rol.descripcion}
-                  </option>
-                );
-              })}
+              {rolesList.map((rol) => (
+                <option key={rol.rol} value={rol.rol}>
+                  {rol.descripcion}
+                </option>
+              ))}
             </select>
             {formErrors.rol && (
               <div className="error-message">{formErrors.rol}</div>
             )}
             {formData.rol && (
               <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>
-                Rol seleccionado: {formData.rol}
+                Rol seleccionado: {formData.rol} - {getRolNameFromKey(formData.rol)}
               </div>
             )}
           </div>

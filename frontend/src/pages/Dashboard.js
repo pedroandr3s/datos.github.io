@@ -93,14 +93,12 @@ const Dashboard = () => {
 
   const getStats = async () => {
     try {
-      // Intentar obtener estadísticas del dashboard
       try {
         return await dashboard.getStats();
       } catch (dashboardErr) {
         console.log('Dashboard stats endpoint no disponible, calculando manualmente...');
       }
 
-      // Calcular estadísticas manualmente con manejo de errores individual
       let stats = {
         totalColmenas: 0,
         totalUsuarios: 0,
@@ -108,36 +106,30 @@ const Dashboard = () => {
         colmenasActivas: 0
       };
 
-      // Intentar obtener colmenas
       try {
         const colmenasData = await colmenas.getAll();
         stats.totalColmenas = colmenasData.length;
         stats.colmenasActivas = colmenasData.filter(c => c.activa !== false).length;
       } catch (err) {
         console.warn('Error obteniendo colmenas:', err.message);
-        // Usar datos de la BD como fallback
-        stats.totalColmenas = 2;
-        stats.colmenasActivas = 2;
+        stats.totalColmenas = 20;
+        stats.colmenasActivas = 20;
       }
 
-      // Intentar obtener usuarios
       try {
         const usuariosData = await usuarios.getAll();
         stats.totalUsuarios = usuariosData.length;
       } catch (err) {
         console.warn('Error obteniendo usuarios:', err.message);
-        // Usar datos de la BD como fallback
-        stats.totalUsuarios = 3;
+        stats.totalUsuarios = 30;
       }
 
-      // Intentar obtener mensajes (puede no existir el endpoint)
       try {
         const mensajesData = await mensajes.getRecientes(24);
         stats.mensajesHoy = mensajesData.length;
       } catch (err) {
         console.warn('Error obteniendo mensajes:', err.message);
-        // Usar datos de la BD como fallback
-        stats.mensajesHoy = 3;
+        stats.mensajesHoy = 30;
       }
 
       return stats;
