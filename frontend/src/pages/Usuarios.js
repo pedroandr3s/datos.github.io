@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApi } from '../context/ApiContext';
+import { useNavigate } from 'react-router-dom';
 import Card from '../components/common/Card';
 import Loading from '../components/common/Loading';
 import Alert from '../components/common/Alert';
@@ -7,6 +8,7 @@ import Modal from '../components/common/Modal';
 
 const Usuarios = () => {
   const { usuarios, roles, loading, error } = useApi();
+  const navigate = useNavigate();
   const [usuariosList, setUsuariosList] = useState([]);
   const [rolesList, setRolesList] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,6 +49,19 @@ const Usuarios = () => {
         message: 'Error al cargar los datos de usuarios'
       });
     }
+  };
+
+  // Función para navegar a colmenas con filtro de usuario
+  const handleNavigateToColmenas = (usuario) => {
+    console.log('🚀 Navegando a colmenas con filtro de usuario:', usuario);
+    
+    // Guardar el filtro en localStorage para que persista
+    localStorage.setItem('colmenas_filtro_dueno', usuario.id);
+    localStorage.setItem('colmenas_filtro_nombre', `${usuario.nombre} ${usuario.apellido}`);
+    localStorage.setItem('colmenas_filtro_aplicar', 'true');
+    
+    // Navegar inmediatamente a la página de colmenas usando React Router
+    navigate('/colmenas');
   };
 
   // Obtener rol por clave (varchar)
@@ -154,7 +169,7 @@ const Usuarios = () => {
       const dataToSend = {
         nombre: formData.nombre.trim(),
         apellido: formData.apellido.trim(),
-        rol: formData.rol.trim() // Add .trim() here!
+        rol: formData.rol.trim()
       };
       
       if (!editingUser) {
@@ -234,11 +249,7 @@ const Usuarios = () => {
 
   const handleMantenedorColmenas = (usuario) => {
     console.log('🏠 Abriendo mantenedor de colmenas para usuario:', usuario);
- 
-    setAlertMessage({
-      type: 'info',
-      message: `Mantenedor de colmenas para ${usuario.nombre} ${usuario.apellido}`
-    });
+    handleNavigateToColmenas(usuario);
   };
 
   const getRoleName = (usuario) => {
@@ -334,13 +345,33 @@ const Usuarios = () => {
                   return (
                     <tr key={usuario.id}>
                       <td>
-                        <span style={{ 
-                          fontWeight: '600', 
-                          color: '#374151',
-                          fontFamily: 'monospace'
-                        }}>
+                        <button
+                          onClick={() => handleNavigateToColmenas(usuario)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '0.375rem',
+                            fontWeight: '600',
+                            color: '#2563eb',
+                            fontFamily: 'monospace',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            textDecoration: 'underline',
+                            textDecorationStyle: 'dotted'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = '#dbeafe';
+                            e.target.style.color = '#1d4ed8';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = 'transparent';
+                            e.target.style.color = '#2563eb';
+                          }}
+                          title={`Ver colmenas de ${usuario.nombre} ${usuario.apellido}`}
+                        >
                           {usuario.id}
-                        </span>
+                        </button>
                       </td>
                       <td>
                         <div>
@@ -372,7 +403,7 @@ const Usuarios = () => {
                             className="btn btn-info btn-sm"
                             onClick={() => handleMantenedorColmenas(usuario)}
                             disabled={isSubmitting}
-                            title="Mantenedor de Colmenas"
+                            title="Ver colmenas de este usuario"
                           >
                             🏠 Colmenas
                           </button>

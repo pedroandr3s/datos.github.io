@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApi } from '../context/ApiContext';
+import { useNavigate } from 'react-router-dom';
 import Card from '../components/common/Card';
 import Loading from '../components/common/Loading';
 import Alert from '../components/common/Alert';
@@ -7,6 +8,7 @@ import Modal from '../components/common/Modal';
 
 const Colmenas = () => {
   const { colmenas, usuarios, nodos, mensajes, loading, error } = useApi();
+  const navigate = useNavigate();
   const [colmenasList, setColmenasList] = useState([]);
   const [usuariosList, setUsuariosList] = useState([]);
   const [nodosList, setNodosList] = useState([]);
@@ -17,13 +19,15 @@ const Colmenas = () => {
   const [colmenaDetail, setColmenaDetail] = useState(null);
   const [alertMessage, setAlertMessage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Estados para filtros
+  const [filtrosDueño, setFiltrosDueño] = useState('');
+  const [colmenasFiltradas, setColmenasFiltradas] = useState([]);
+  const [filtroDesdeUsuarios, setFiltroDesdeUsuarios] = useState(null);
+  
   const [formData, setFormData] = useState({
     descripcion: '',
-    dueno: '',
-    latitud: '',
-    longitud: '',
-    ubicacion_descripcion: '',
-    comuna: ''
+    dueno: ''
   });
   const [formErrors, setFormErrors] = useState({});
   
@@ -41,6 +45,76 @@ const Colmenas = () => {
       loadData();
     }
   }, [isAuthenticated]);
+
+  // Efecto para aplicar filtros cuando cambien las colmenas o el filtro
+  useEffect(() => {
+    aplicarFiltros();
+  }, [colmenasList, filtrosDueño]);
+
+  // Efecto para verificar si hay filtro desde usuarios al cargar
+  useEffect(() => {
+    verificarFiltroDesdeUsuarios();
+  }, [usuariosList]);
+
+  const verificarFiltroDesdeUsuarios = () => {
+    const filtroGuardado = localStorage.getItem('colmenas_filtro_dueno');
+    const nombreGuardado = localStorage.getItem('colmenas_filtro_nombre');
+    const aplicarFiltro = localStorage.getItem('colmenas_filtro_aplicar');
+    
+    if (filtroGuardado && aplicarFiltro === 'true' && usuariosList.length > 0) {
+      console.log('🔍 Aplicando filtro desde usuarios:', filtroGuardado);
+      
+      // Verificar que el usuario existe en la lista
+      const usuarioExiste = usuariosList.find(u => u.id === filtroGuardado);
+      
+      if (usuarioExiste) {
+        setFiltrosDueño(filtroGuardado);
+        setFiltroDesdeUsuarios({
+          id: filtroGuardado,
+          nombre: nombreGuardado || `Usuario ${filtroGuardado}`
+        });
+        
+        // Mostrar mensaje informativo
+        setAlertMessage({
+          type: 'success',
+          message: `✅ Filtro aplicado: Mostrando colmenas de ${nombreGuardado || filtroGuardado}`
+        });
+      }
+      
+      // Limpiar los flags de filtro guardado
+      localStorage.removeItem('colmenas_filtro_dueno');
+      localStorage.removeItem('colmenas_filtro_nombre');
+      localStorage.removeItem('colmenas_filtro_aplicar');
+    }
+  };
+
+  // Función para aplicar filtro manualmente (si el usuario ya está en colmenas)
+  const aplicarFiltroGuardado = () => {
+    const filtroGuardado = localStorage.getItem('colmenas_filtro_dueno');
+    const nombreGuardado = localStorage.getItem('colmenas_filtro_nombre');
+    
+    if (filtroGuardado && usuariosList.length > 0) {
+      const usuarioExiste = usuariosList.find(u => u.id === filtroGuardado);
+      
+      if (usuarioExiste) {
+        setFiltrosDueño(filtroGuardado);
+        setFiltroDesdeUsuarios({
+          id: filtroGuardado,
+          nombre: nombreGuardado || `Usuario ${filtroGuardado}`
+        });
+        
+        setAlertMessage({
+          type: 'success',
+          message: `✅ Filtro aplicado: ${nombreGuardado || filtroGuardado}`
+        });
+        
+        // Limpiar filtro guardado
+        localStorage.removeItem('colmenas_filtro_dueno');
+        localStorage.removeItem('colmenas_filtro_nombre');
+        localStorage.removeItem('colmenas_filtro_aplicar');
+      }
+    }
+  };
 
   const checkAuthentication = () => {
     try {
@@ -100,6 +174,109 @@ const Colmenas = () => {
         message: 'Error al cargar los datos de colmenas'
       });
     }
+  };
+
+  // Función para aplicar filtros
+  const aplicarFiltros = () => {
+    let colmenasFiltradas = [...colmenasList];
+
+    // Filtrar por dueño si hay un filtro seleccionado
+    if (filtrosDueño && filtrosDueño !== '') {
+      colmenasFiltradas = colmenasFiltradas.filter(colmena => 
+        colmena.dueno.toString() === filtrosDueño.toString()
+      );
+    }
+
+    setColmenasFiltradas(colmenasFiltradas);
+  };
+
+  // Función para limpiar filtros
+  const limpiarFiltros = () => {
+    setFiltrosDueño('');
+    setFiltroDesdeUsuarios(null);
+  };
+
+  // Función para volver a usuarios
+  const volverAUsuarios = () => {
+    navigate('/usuarios');
+  };
+
+  // Verificar si hay filtro pendiente al cargar la página
+  useEffect(() => {
+    const verificarFiltroPendiente = () => {
+      const filtroGuardado = localStorage.getItem('colmenas_filtro_dueno');
+      const aplicarFiltro = localStorage.getItem('colmenas_filtro_aplicar');
+      
+      if (filtroGuardado && aplicarFiltro === 'true') {
+        // Mostrar botón para aplicar filtro
+        setAlertMessage({
+          type: 'info',
+          message: (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <span>Tienes un filtro pendiente de usuarios.</span>
+              <button 
+                onClick={aplicarFiltroGuardado}
+                style={{
+                  background: '#059669',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.25rem 0.75rem',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Aplicar Filtro
+              </button>
+            </div>
+          )
+        });
+      }
+    };
+    
+    if (usuariosList.length > 0) {
+      verificarFiltroPendiente();
+    }
+  }, [usuariosList]);
+
+  // Función para obtener ubicación de una colmena basada en sus nodos
+  const getUbicacionColmena = (colmena) => {
+    // Si la colmena tiene nodos asociados con ubicación
+    if (colmena.nodos && colmena.nodos.length > 0) {
+      const nodoConUbicacion = colmena.nodos.find(nodo => 
+        nodo.ubicacion && (nodo.ubicacion.comuna || nodo.ubicacion.descripcion)
+      );
+      
+      if (nodoConUbicacion && nodoConUbicacion.ubicacion) {
+        const ubicacion = nodoConUbicacion.ubicacion;
+        return {
+          comuna: ubicacion.comuna,
+          descripcion: ubicacion.descripcion,
+          latitud: ubicacion.latitud,
+          longitud: ubicacion.longitud
+        };
+      }
+    }
+    
+    // Si no tiene nodos con ubicación, buscar en propiedades directas (fallback)
+    if (colmena.ubicacion) {
+      return colmena.ubicacion;
+    }
+    
+    return null;
+  };
+  const getEstadisticasFiltros = () => {
+    const total = colmenasList.length;
+    const filtradas = colmenasFiltradas.length;
+    
+    return { total, filtradas };
+  };
+
+  // Función para obtener el nombre del usuario seleccionado en el filtro
+  const getNombreDuenoFiltrado = () => {
+    if (!filtrosDueño) return '';
+    const usuario = usuariosList.find(u => u.id.toString() === filtrosDueño.toString());
+    return usuario ? `${usuario.nombre} ${usuario.apellido}` : '';
   };
 
   const loadColmenaDetail = async (colmenaId) => {
@@ -169,21 +346,13 @@ const Colmenas = () => {
       setEditingColmena(colmena);
       setFormData({
         descripcion: colmena.descripcion || '',
-        dueno: colmena.dueno || '',
-        latitud: colmena.latitud || '',
-        longitud: colmena.longitud || '',
-        ubicacion_descripcion: colmena.ubicacion_descripcion || '',
-        comuna: colmena.comuna || ''
+        dueno: colmena.dueno || ''
       });
     } else {
       setEditingColmena(null);
       setFormData({
         descripcion: '',
-        dueno: '',
-        latitud: '',
-        longitud: '',
-        ubicacion_descripcion: '',
-        comuna: ''
+        dueno: ''
       });
     }
     setFormErrors({});
@@ -195,11 +364,7 @@ const Colmenas = () => {
     setEditingColmena(null);
     setFormData({
       descripcion: '',
-      dueno: '',
-      latitud: '',
-      longitud: '',
-      ubicacion_descripcion: '',
-      comuna: ''
+      dueno: ''
     });
     setFormErrors({});
     setIsSubmitting(false);
@@ -228,14 +393,6 @@ const Colmenas = () => {
       errors.dueno = 'El dueño es requerido';
     }
 
-    if (formData.latitud && (isNaN(formData.latitud) || formData.latitud < -90 || formData.latitud > 90)) {
-      errors.latitud = 'Latitud debe ser un número entre -90 y 90';
-    }
-
-    if (formData.longitud && (isNaN(formData.longitud) || formData.longitud < -180 || formData.longitud > 180)) {
-      errors.longitud = 'Longitud debe ser un número entre -180 y 180';
-    }
-
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -257,12 +414,9 @@ const Colmenas = () => {
         dueno: formData.dueno
       };
 
-      let colmenaId;
-      
       if (editingColmena) {
         console.log('✏️ Actualizando colmena:', editingColmena.id);
         await colmenas.update(editingColmena.id, colmenaData);
-        colmenaId = editingColmena.id;
         setAlertMessage({
           type: 'success',
           message: 'Colmena actualizada correctamente'
@@ -270,30 +424,10 @@ const Colmenas = () => {
       } else {
         console.log('➕ Creando nueva colmena');
         const nuevaColmena = await colmenas.create(colmenaData);
-        colmenaId = nuevaColmena.id;
         setAlertMessage({
           type: 'success',
           message: 'Colmena creada correctamente'
         });
-      }
-
-      // Intentar agregar ubicación si hay datos y el método existe
-      if (formData.latitud && formData.longitud && colmenas.addUbicacion) {
-        const ubicacionData = {
-          latitud: parseFloat(formData.latitud),
-          longitud: parseFloat(formData.longitud),
-          descripcion: formData.ubicacion_descripcion,
-          comuna: formData.comuna
-        };
-        
-        try {
-          console.log('📍 Agregando ubicación:', ubicacionData);
-          await colmenas.addUbicacion(colmenaId, ubicacionData);
-          console.log('✅ Ubicación agregada exitosamente');
-        } catch (ubicErr) {
-          console.warn('⚠️ Error agregando ubicación (puede ser normal si el endpoint no existe):', ubicErr);
-          // No mostrar error al usuario, ya que la colmena se creó exitosamente
-        }
       }
       
       handleCloseModal();
@@ -382,13 +516,8 @@ const Colmenas = () => {
   const canEditColmena = (colmena) => {
     if (!currentUser) return false;
     
-    // Administradores pueden editar cualquier colmena
-    if (currentUser.rol === 'ADM') return true;
-    
-    // Los dueños pueden editar sus propias colmenas
-    if (colmena.dueno === currentUser.id) return true;
-    
-    return false;
+    // Todos los usuarios autenticados pueden editar cualquier colmena
+    return true;
   };
 
   const canDeleteColmena = () => {
@@ -404,12 +533,26 @@ const Colmenas = () => {
     return <Loading message="Cargando colmenas..." />;
   }
 
+  const estadisticas = getEstadisticasFiltros();
+
   return (
     <div>
       {/* Header con información del usuario actual */}
       <div className="flex flex-between flex-center mb-6">
         <div>
-          <h1 className="page-title" style={{ margin: 0 }}>Colmenas</h1>
+          <h1 className="page-title" style={{ margin: 0 }}>
+            Colmenas
+            {filtroDesdeUsuarios && (
+              <span style={{ 
+                fontSize: '1rem', 
+                fontWeight: '400',
+                color: '#6b7280',
+                marginLeft: '0.5rem'
+              }}>
+                - {filtroDesdeUsuarios.nombre}
+              </span>
+            )}
+          </h1>
           {currentUser && (
             <p style={{ 
               fontSize: '0.875rem', 
@@ -421,13 +564,50 @@ const Colmenas = () => {
             </p>
           )}
         </div>
-        <button 
-          className="btn btn-primary"
-          onClick={() => handleOpenModal()}
-          disabled={isSubmitting}
-        >
-          + Nueva Colmena
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {/* Botón para verificar filtros pendientes */}
+          {(() => {
+            const filtroGuardado = localStorage.getItem('colmenas_filtro_dueno');
+            const aplicarFiltro = localStorage.getItem('colmenas_filtro_aplicar');
+            
+            if (filtroGuardado && aplicarFiltro === 'true') {
+              return (
+                <button 
+                  className="btn btn-success"
+                  onClick={aplicarFiltroGuardado}
+                  style={{ 
+                    padding: '0.75rem 1rem',
+                    fontSize: '0.875rem'
+                  }}
+                  title="Aplicar filtro guardado desde usuarios"
+                >
+                  🔍 Aplicar Filtro
+                </button>
+              );
+            }
+            return null;
+          })()}
+          
+          {filtroDesdeUsuarios && (
+            <button 
+              className="btn btn-secondary"
+              onClick={volverAUsuarios}
+              style={{ 
+                padding: '0.75rem 1rem',
+                fontSize: '0.875rem'
+              }}
+            >
+              ← Menú Principal
+            </button>
+          )}
+          <button 
+            className="btn btn-primary"
+            onClick={() => handleOpenModal()}
+            disabled={isSubmitting}
+          >
+            + Nueva Colmena
+          </button>
+        </div>
       </div>
 
       {alertMessage && (
@@ -438,20 +618,135 @@ const Colmenas = () => {
         />
       )}
 
-      <Card title="Lista de Colmenas">
-        {colmenasList.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🏠</div>
-            <h3 style={{ marginBottom: '0.5rem', color: '#374151' }}>
-              No hay colmenas registradas
-            </h3>
-            <p>Comienza agregando tu primera colmena</p>
-            <button 
-              className="btn btn-primary mt-4"
-              onClick={() => handleOpenModal()}
+      {/* Panel de Filtros */}
+      <Card title="🔍 Filtros de Búsqueda" className="mb-6">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+          gap: '1rem',
+          alignItems: 'end'
+        }}>
+          {/* Filtro por Dueño */}
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ 
+              fontSize: '0.875rem', 
+              fontWeight: '500',
+              marginBottom: '0.5rem' 
+            }}>
+              Filtrar por Dueño
+            </label>
+            <select
+              className="form-select"
+              value={filtrosDueño}
+              onChange={(e) => setFiltrosDueño(e.target.value)}
+              style={{ 
+                padding: '0.75rem',
+                backgroundColor: filtroDesdeUsuarios ? '#f0f9ff' : '#f9fafb',
+                border: filtroDesdeUsuarios ? '2px solid #0ea5e9' : '2px solid #e5e7eb',
+                borderRadius: '0.5rem'
+              }}
             >
-              Crear Colmena
+              <option value="">Todos los dueños</option>
+              {usuariosList.map((usuario) => {
+                const colmenasDelUsuario = colmenasList.filter(c => c.dueno === usuario.id).length;
+                return (
+                  <option key={usuario.id} value={usuario.id}>
+                    {usuario.nombre} {usuario.apellido} ({colmenasDelUsuario} colmenas)
+                    {usuario.rol === 'ADM' ? ' - Administrador' : ''}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* Botón de acción */}
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              className="btn btn-secondary"
+              onClick={limpiarFiltros}
+              disabled={!filtrosDueño}
+              style={{ 
+                padding: '0.75rem 1rem',
+                opacity: !filtrosDueño ? 0.5 : 1
+              }}
+            >
+              🗑️ Limpiar Filtros
             </button>
+          </div>
+        </div>
+
+        {/* Estadísticas de filtros */}
+        <div style={{ 
+          marginTop: '1rem',
+          padding: '0.75rem',
+          backgroundColor: filtroDesdeUsuarios ? '#ecfdf5' : '#f0f9ff',
+          border: filtroDesdeUsuarios ? '1px solid #86efac' : '1px solid #bae6fd',
+          borderRadius: '0.5rem',
+          fontSize: '0.875rem',
+          color: filtroDesdeUsuarios ? '#166534' : '#0c4a6e'
+        }}>
+          <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+            <span>
+              📊 <strong>Total de colmenas:</strong> {estadisticas.total}
+            </span>
+            <span>
+              🔍 <strong>Mostrando:</strong> {estadisticas.filtradas}
+            </span>
+            {filtrosDueño && (
+              <span>
+                ✅ <strong>Filtro activo:</strong> {getNombreDuenoFiltrado()}
+              </span>
+            )}
+            {filtroDesdeUsuarios && (
+              <span>
+                🔗 <strong>Filtro desde usuarios:</strong> {filtroDesdeUsuarios.nombre}
+              </span>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      <Card title="Lista de Colmenas">
+        {colmenasFiltradas.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>
+              {filtrosDueño ? '🔍' : '🏠'}
+            </div>
+            <h3 style={{ marginBottom: '0.5rem', color: '#374151' }}>
+              {filtrosDueño ? 'No se encontraron colmenas' : 'No hay colmenas registradas'}
+            </h3>
+            <p>
+              {filtrosDueño ? 
+                `No hay colmenas asignadas a ${getNombreDuenoFiltrado()}` : 
+                'Comienza agregando la primera colmena'
+              }
+            </p>
+            {!filtrosDueño && currentUser && (
+              <button 
+                className="btn btn-primary mt-4"
+                onClick={() => handleOpenModal()}
+              >
+                Crear Colmena
+              </button>
+            )}
+            {filtrosDueño && (
+              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginTop: '1rem' }}>
+                <button 
+                  className="btn btn-secondary"
+                  onClick={limpiarFiltros}
+                >
+                  Limpiar Filtros
+                </button>
+                {filtroDesdeUsuarios && (
+                  <button 
+                    className="btn btn-primary"
+                    onClick={volverAUsuarios}
+                  >
+                    Volver a Usuarios
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ overflow: 'auto' }}>
@@ -467,7 +762,7 @@ const Colmenas = () => {
                 </tr>
               </thead>
               <tbody>
-                {colmenasList.map((colmena) => (
+                {colmenasFiltradas.map((colmena) => (
                   <tr key={colmena.id}>
                     <td>
                       <span style={{ 
@@ -494,33 +789,53 @@ const Colmenas = () => {
                       <div style={{ fontWeight: '500' }}>
                         {getDuenoName(colmena.dueno)}
                       </div>
-                      {/* Indicador si es tu colmena */}
-                      {currentUser && colmena.dueno === currentUser.id && (
-                        <div style={{ 
-                          fontSize: '0.75rem', 
-                          color: '#059669',
-                          fontWeight: '500'
-                        }}>
-                          Mi colmena
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      {colmena.comuna ? (
-                        <div>
-                          <div style={{ fontWeight: '500' }}>{colmena.comuna}</div>
-                          {colmena.latitud && colmena.longitud && (
+                      {/* Indicador de rol del dueño */}
+                      {(() => {
+                        const usuario = usuariosList.find(u => u.id === colmena.dueno);
+                        if (usuario) {
+                          return (
                             <div style={{ 
                               fontSize: '0.75rem', 
-                              color: '#6b7280' 
+                              color: usuario.rol === 'ADM' ? '#dc2626' : '#059669',
+                              fontWeight: '500'
                             }}>
-                              {parseFloat(colmena.latitud).toFixed(4)}, {parseFloat(colmena.longitud).toFixed(4)}
+                              {usuario.rol === 'ADM' ? 'Administrador' : 'Usuario'}
+                              {filtroDesdeUsuarios && filtroDesdeUsuarios.id === usuario.id && 
+                                <span style={{ marginLeft: '0.25rem' }}>🎯</span>
+                              }
                             </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span style={{ color: '#6b7280' }}>Sin ubicación</span>
-                      )}
+                          );
+                        }
+                        return null;
+                      })()}
+                    </td>
+                    <td>
+                      {(() => {
+                        const ubicacion = getUbicacionColmena(colmena);
+                        
+                        if (ubicacion && (ubicacion.comuna || ubicacion.descripcion)) {
+                          return (
+                            <div>
+                              <div style={{ fontWeight: '500' }}>
+                                {ubicacion.comuna && ubicacion.descripcion 
+                                  ? `${ubicacion.comuna} - ${ubicacion.descripcion}`
+                                  : ubicacion.comuna || ubicacion.descripcion
+                                }
+                              </div>
+                              {ubicacion.latitud && ubicacion.longitud && (
+                                <div style={{ 
+                                  fontSize: '0.75rem', 
+                                  color: '#6b7280' 
+                                }}>
+                                  {parseFloat(ubicacion.latitud).toFixed(4)}, {parseFloat(ubicacion.longitud).toFixed(4)}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        } else {
+                          return <span style={{ color: '#6b7280' }}>Sin ubicación</span>;
+                        }
+                      })()}
                     </td>
                     <td>
                       <span className="badge badge-success">
@@ -571,7 +886,7 @@ const Colmenas = () => {
         )}
       </Card>
 
-      {/* Modal para crear/editar colmena */}
+      {/* Modal para crear/editar colmena - Formulario original del administrador */}
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
@@ -607,7 +922,7 @@ const Colmenas = () => {
                 {usuariosList.map((usuario) => (
                   <option key={usuario.id} value={usuario.id}>
                     {usuario.nombre} {usuario.apellido}
-                    {usuario.id === currentUser?.id ? ' (Tú)' : ''}
+                    {usuario.rol === 'ADM' ? ' (Administrador)' : ''}
                   </option>
                 ))}
               </select>
@@ -617,74 +932,23 @@ const Colmenas = () => {
             </div>
           </div>
 
-          <h4 style={{ 
-            marginTop: '2rem', 
-            marginBottom: '1rem',
-            fontSize: '1rem',
-            fontWeight: '600',
-            color: '#374151'
+          <div style={{
+            marginTop: '1.5rem',
+            padding: '1rem',
+            backgroundColor: '#f0f9ff',
+            border: '1px solid #bae6fd',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem',
+            color: '#0c4a6e'
           }}>
-            Ubicación (Opcional)
-          </h4>
-
-          <div className="grid grid-2">
-            <div className="form-group">
-              <label className="form-label">Latitud</label>
-              <input
-                type="number"
-                step="any"
-                className={`form-input ${formErrors.latitud ? 'error' : ''}`}
-                value={formData.latitud}
-                onChange={(e) => setFormData({...formData, latitud: e.target.value})}
-                placeholder="-36.606111"
-                disabled={isSubmitting}
-              />
-              {formErrors.latitud && (
-                <div className="error-message">{formErrors.latitud}</div>
-              )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '1rem' }}>ℹ️</span>
+              <strong>Información sobre ubicaciones</strong>
             </div>
-
-            <div className="form-group">
-              <label className="form-label">Longitud</label>
-              <input
-                type="number"
-                step="any"
-                className={`form-input ${formErrors.longitud ? 'error' : ''}`}
-                value={formData.longitud}
-                onChange={(e) => setFormData({...formData, longitud: e.target.value})}
-                placeholder="-72.103611"
-                disabled={isSubmitting}
-              />
-              {formErrors.longitud && (
-                <div className="error-message">{formErrors.longitud}</div>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-2">
-            <div className="form-group">
-              <label className="form-label">Comuna</label>
-              <input
-                type="text"
-                className="form-input"
-                value={formData.comuna}
-                onChange={(e) => setFormData({...formData, comuna: e.target.value})}
-                placeholder="Chillán"
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Descripción de Ubicación</label>
-              <input
-                type="text"
-                className="form-input"
-                value={formData.ubicacion_descripcion}
-                onChange={(e) => setFormData({...formData, ubicacion_descripcion: e.target.value})}
-                placeholder="Ubicada en predio agrícola"
-                disabled={isSubmitting}
-              />
-            </div>
+            <p style={{ margin: 0 }}>
+              Las ubicaciones de las colmenas se obtienen automáticamente desde los nodos IoT asociados. 
+              Para establecer ubicaciones, gestiona los nodos desde la sección correspondiente.
+            </p>
           </div>
 
           <div className="flex flex-gap flex-between mt-6">
@@ -732,34 +996,49 @@ const Colmenas = () => {
                     <strong>Dueño:</strong>
                     <p style={{ margin: '0.25rem 0 0', color: '#6b7280' }}>
                       {getDuenoName(colmenaDetail.dueno)}
-                      {currentUser && colmenaDetail.dueno === currentUser.id && (
-                        <span style={{ 
-                          marginLeft: '0.5rem',
-                          fontSize: '0.75rem', 
-                          color: '#059669',
-                          fontWeight: '500'
-                        }}>
-                          (Tu colmena)
-                        </span>
-                      )}
+                      {(() => {
+                        const usuario = usuariosList.find(u => u.id === colmenaDetail.dueno);
+                        if (usuario) {
+                          return (
+                            <span style={{ 
+                              marginLeft: '0.5rem',
+                              fontSize: '0.75rem', 
+                              color: usuario.rol === 'ADM' ? '#dc2626' : '#059669',
+                              fontWeight: '500'
+                            }}>
+                              ({usuario.rol === 'ADM' ? 'Administrador' : 'Usuario'})
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                     </p>
                   </div>
-                  {colmenaDetail.comuna && (
-                    <div>
-                      <strong>Ubicación:</strong>
-                      <p style={{ margin: '0.25rem 0 0', color: '#6b7280' }}>
-                        {colmenaDetail.comuna}
-                        {colmenaDetail.latitud && colmenaDetail.longitud && (
-                          <>
-                            <br />
-                            <span style={{ fontSize: '0.875rem' }}>
-                              {parseFloat(colmenaDetail.latitud).toFixed(6)}, {parseFloat(colmenaDetail.longitud).toFixed(6)}
-                            </span>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  )}
+                  {(() => {
+                    const ubicacion = getUbicacionColmena(colmenaDetail);
+                    if (ubicacion && (ubicacion.comuna || ubicacion.descripcion)) {
+                      return (
+                        <div>
+                          <strong>Ubicación:</strong>
+                          <p style={{ margin: '0.25rem 0 0', color: '#6b7280' }}>
+                            {ubicacion.comuna && ubicacion.descripcion 
+                              ? `${ubicacion.comuna} - ${ubicacion.descripcion}`
+                              : ubicacion.comuna || ubicacion.descripcion
+                            }
+                            {ubicacion.latitud && ubicacion.longitud && (
+                              <>
+                                <br />
+                                <span style={{ fontSize: '0.875rem' }}>
+                                  {parseFloat(ubicacion.latitud).toFixed(6)}, {parseFloat(ubicacion.longitud).toFixed(6)}
+                                </span>
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               </Card>
 
@@ -779,6 +1058,20 @@ const Colmenas = () => {
                       color: '#6b7280'
                     }}>
                       Visualizando como: <strong>{currentUser.nombre}</strong>
+                      <br />
+                      <span style={{ fontSize: '0.75rem' }}>
+                        ({currentUser.rol_nombre || currentUser.rol})
+                      </span>
+                    </div>
+                  )}
+                  {filtroDesdeUsuarios && (
+                    <div style={{ 
+                      marginTop: '0.5rem',
+                      fontSize: '0.75rem',
+                      color: '#059669',
+                      fontWeight: '500'
+                    }}>
+                      🔗 Filtro desde usuarios activo
                     </div>
                   )}
                 </div>
@@ -834,6 +1127,15 @@ const Colmenas = () => {
                 }}>
                   Acceso: {currentUser?.rol_nombre || currentUser?.rol}
                 </div>
+                {filtroDesdeUsuarios && (
+                  <div style={{ 
+                    fontSize: '0.75rem',
+                    marginTop: '0.5rem',
+                    color: '#059669'
+                  }}>
+                    Vista filtrada desde gestión de usuarios
+                  </div>
+                )}
               </div>
             </Card>
           </div>

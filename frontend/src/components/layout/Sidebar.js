@@ -1,31 +1,41 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApi } from '../../context/ApiContext';
 
-const Sidebar = ({ currentPage, setCurrentPage }) => {
+const Sidebar = ({ currentPage }) => {
+  const navigate = useNavigate();
   const { isConnected } = useApi();
 
   const menuItems = [
     { 
       id: 'dashboard', 
       label: 'Dashboard', 
-      icon: '📊' 
+      icon: '📊',
+      path: '/dashboard'
     },
     { 
       id: 'usuarios', 
       label: 'Usuarios', 
-      icon: '👥' 
+      icon: '👥',
+      path: '/usuarios'
     },
     { 
       id: 'colmenas', 
       label: 'Colmenas', 
-      icon: '🏠' 
+      icon: '🏠',
+      path: '/colmenas'
     },
     { 
       id: 'revisiones', 
-      label: 'Revisiones', 
-      icon: '📋' 
+      label: 'Nodos', 
+      icon: '📋',
+      path: '/revisiones'
     }
   ];
+
+  const handleMenuClick = (path) => {
+    navigate(path);
+  };
 
   return (
     <div className="sidebar">
@@ -44,7 +54,7 @@ const Sidebar = ({ currentPage, setCurrentPage }) => {
             color: '#1f2937',
             margin: 0
           }}>
-            ApiControl
+            SmartBee
           </h2>
         </div>
 
@@ -82,7 +92,7 @@ const Sidebar = ({ currentPage, setCurrentPage }) => {
           {menuItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setCurrentPage(item.id)}
+              onClick={() => handleMenuClick(item.path)}
               style={{
                 width: '100%',
                 padding: '0.75rem 1rem',
@@ -146,3 +156,4 @@ const Sidebar = ({ currentPage, setCurrentPage }) => {
 };
 
 export default Sidebar;
+

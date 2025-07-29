@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApi } from '../context/ApiContext';
 import './login.css';
 
 const Login = ({ onLoginSuccess }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -124,7 +126,15 @@ const Login = ({ onLoginSuccess }) => {
         localStorage.setItem('smartbee_user', JSON.stringify(result.data.usuario));
         
         console.log('✅ Login exitoso:', result.data.usuario);
+        
+        // Llamar al callback de login exitoso
         onLoginSuccess(result.data.usuario);
+        
+        // Redirigir a usuarios después del login
+        setTimeout(() => {
+          navigate('/usuarios');
+        }, 100);
+        
       } else {
         throw new Error(result.error || 'Error al iniciar sesión');
       }

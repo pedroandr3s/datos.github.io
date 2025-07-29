@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { ApiProvider } from './context/ApiContext';
-import Login from './pages/Login'; // Asegúrate de que la ruta sea correcta
+import Login from './pages/Login';
 import Navbar from './components/layout/Navbar';
 import Sidebar from './components/layout/Sidebar';
 import Dashboard from './pages/Dashboard';
@@ -8,8 +9,52 @@ import Usuarios from './pages/Usuarios';
 import Colmenas from './pages/Colmenas';
 import Revisiones from './pages/Revisiones';
 
+// Componente wrapper para la aplicación autenticada
+const AuthenticatedApp = ({ currentUser, onLogout }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Función para cambiar página y actualizar URL
+  const setCurrentPage = (page) => {
+    navigate(`/${page}`);
+  };
+
+  // Obtener página actual desde la URL
+  const getCurrentPage = () => {
+    const path = location.pathname;
+    if (path === '/') return 'dashboard';
+    return path.substring(1); // Remover el '/' inicial
+  };
+
+  return (
+    <div className="app">
+      <Sidebar 
+        currentPage={getCurrentPage()} 
+        setCurrentPage={setCurrentPage}
+        currentUser={currentUser}
+      />
+      <div className="main-content">
+        <Navbar 
+          currentUser={currentUser}
+          onLogout={onLogout}
+        />
+        <div className="page-container">
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/usuarios" element={<Usuarios />} />
+            <Route path="/colmenas" element={<Colmenas />} />
+            <Route path="/revisiones" element={<Revisiones />} />
+            {/* Ruta catch-all para páginas no encontradas */}
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 function App() {
-  const [currentPage, setCurrentPage] = useState('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +89,6 @@ function App() {
   const handleLoginSuccess = (userData) => {
     setCurrentUser(userData);
     setIsAuthenticated(true);
-    setCurrentPage('usuarios'); // Redirigir a la página de usuarios como solicitas
     console.log('🚀 Usuario autenticado, redirigiendo a usuarios');
   };
 
@@ -54,23 +98,7 @@ function App() {
     localStorage.removeItem('smartbee_user');
     setCurrentUser(null);
     setIsAuthenticated(false);
-    setCurrentPage('dashboard');
     console.log('👋 Usuario desconectado');
-  };
-
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'dashboard':
-        return <Dashboard />;
-      case 'usuarios':
-        return <Usuarios />;
-      case 'colmenas':
-        return <Colmenas />;
-      case 'revisiones':
-        return <Revisiones />;
-      default:
-        return <Dashboard />;
-    }
   };
 
   // Mostrar loading mientras verifica la autenticación
@@ -86,30 +114,20 @@ function App() {
   }
 
   return (
-    <ApiProvider>
-      {/* Si no está autenticado, mostrar login */}
-      {!isAuthenticated ? (
-        <Login onLoginSuccess={handleLoginSuccess} />
-      ) : (
-        /* Si está autenticado, mostrar la aplicación principal */
-        <div className="app">
-          <Sidebar 
-            currentPage={currentPage} 
-            setCurrentPage={setCurrentPage}
-            currentUser={currentUser}
+    <Router>
+      <ApiProvider>
+        {/* Si no está autenticado, mostrar login */}
+        {!isAuthenticated ? (
+          <Login onLoginSuccess={handleLoginSuccess} />
+        ) : (
+          /* Si está autenticado, mostrar la aplicación principal */
+          <AuthenticatedApp 
+            currentUser={currentUser} 
+            onLogout={handleLogout} 
           />
-          <div className="main-content">
-            <Navbar 
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            />
-            <div className="page-container">
-              {renderPage()}
-            </div>
-          </div>
-        </div>
-      )}
-    </ApiProvider>
+        )}
+      </ApiProvider>
+    </Router>
   );
 }
 
